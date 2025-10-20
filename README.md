@@ -1,6 +1,6 @@
 # Flairies
 
-Flairies is a mobile-first app designed for all the girls oit there to sell, rent or donate clothes and accessories. It emphasizes community, sustainability and girlhood empowerment, enabling users to share their wardrobe, discover fashion items and connect safely.
+**Flairies** is a mobile-first app designed for all the girls oit there to sell, rent or donate clothes and accessories. It emphasizes community, sustainability and girlhood empowerment, enabling users to share their wardrobe, discover fashion items and connect safely.
 
 ## Features
 
