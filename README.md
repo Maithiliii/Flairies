@@ -4,18 +4,20 @@
 
 ## Features
 
-**User Profiles:** Sign-up/login, personal info, style preferences, optional social connections.  
-**Listings:** Post clothes, shoes, bags, jewelry, and fashion accessories with images, sizes, and descriptions.  
-**Transactions:** Sell or rent items locally with Cash on Delivery or meetup options.  
-**Wishlist & Alerts:** Notifications when desired items are posted.  
-**Donations:** Option to donate items to partner NGOs.  
-**Search & Filter:** Filter by type, size, color, price, or category.  
-**Admin Panel:** App moderation, featured items, donation management.  
-**Payments:** Integrated online payment system.  
+**User Profiles:** Secure sign-up/login, profile management, seller details, and address storage with location sync.  
+**Listings:** Post thrift fashion items including clothes, shoes, bags, and accessories with images, pricing, size, and descriptions.  
+**Transactions:** Buy, sell, rent, or donate items with order tracking and item availability management.  
+**Payments:** Integrated Razorpay for secure online payments with order confirmation and status updates.  
+**Location Services:** Google Maps–based location picker for address selection, reverse geocoding, and delivery coordination.  
+**Real-Time Chat:** In-app messaging between buyers and sellers with conversation management.  
+**Search & Filter:** Browse and filter listings by category, size, price, and availability.  
+**Notifications:** In-app and push notifications for purchases, messages, and order updates.  
+**Admin Panel:** Platform moderation, user and listing management, and transaction monitoring.  
+
 
 ## Tech Stack
 
-**-Frontend:** React Native with Expo, Redux Toolkit, React Navigation  
+**-Frontend:** React Native with Expo, Redux Toolkit, React Navigation 
 **-Backend:** Django REST Framework / Supabase for authentication & database  
 **-Database:** Supabase PostgreSQL
 
