@@ -21,3 +21,34 @@
 **-Backend:** Django REST Framework / Supabase for authentication & database  
 **-Database:** Supabase PostgreSQL
 
+## Demo Screenshots  
+
+### Signup & Login
+<p float="left">
+  <img src="./assets/images/Signup.jpeg" alt="Signup" width="200" />
+  <img src="./assets/images/Login.jpeg" alt="Login" width="200" />
+</p>
+
+### Home & Profile
+<p float="left">
+  <img src="./assets/images/Home.jpeg" alt="Home" width="200" />
+  <img src="./assets/images/Profile.jpeg" alt="Profile" width="200" />
+</p>
+
+### Chat & Seller Profile
+<p float="left">
+  <img src="./assets/images/Chat.jpeg" alt="Chat" width="200" />
+  <img src="./assets/images/SellerProfile.jpeg" alt="Seller Profile" width="200" />
+</p>
+
+### Buy & Sell
+<p float="left">
+  <img src="./assets/images/Buy.jpeg" alt="Buy" width="200" />
+  <img src="./assets/images/Sell.jpeg" alt="Sell" width="200" />
+</p>
+
+### My Orders & Google Maps
+<p float="left">
+  <img src="./assets/images/MyOrders.jpeg" alt="My Orders" width="200" />
+  <img src="./assets/images/GoogleMaps.jpeg" alt="Google Maps" width="200" />
+</p>
