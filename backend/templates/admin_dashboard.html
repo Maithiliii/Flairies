@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flairies Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #ff1493, #ff69b4);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #ff1493;
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff1493;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-card .subtitle {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #ff1493;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .btn {
+            background: #ff1493;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #e91e63;
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        
+        .success {
+            background: #efe;
+            color: #363;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        
+        .payout-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .payout-status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .payout-status.processing {
+            background: #cce5ff;
+            color: #004085;
+        }
+        
+        .payout-status.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .refresh-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Flairies Admin Dashboard</h1>
+        <p>Your Marketplace Revenue & Payout Management</p>
+    </div>
+    
+    <div class="container">
+        <div id="loading" class="loading">
+            <h3>Loading dashboard data...</h3>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="success" class="success" style="display: none;"></div>
+        
+        <div id="dashboard" style="display: none;">
+            <!-- Revenue Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Today's Revenue</h3>
+                    <div class="value" id="todayRevenue">₹0</div>
+                    <div class="subtitle" id="todayOrders">0 orders</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>Monthly Revenue</h3>
+                    <div class="value" id="monthlyRevenue">₹0</div>
+                    <div class="subtitle" id="monthlyOrders">0 orders</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>All-Time Revenue</h3>
+                    <div class="value" id="totalRevenue">₹0</div>
+                    <div class="subtitle" id="totalOrders">0 orders</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>Pending Payouts</h3>
+                    <div class="value" id="pendingPayouts">₹0</div>
+                    <div class="subtitle" id="pendingCount">0 sellers</div>
+                </div>
+            </div>
+            
+            <!-- Payout Management -->
+            <div class="section">
+                <h2>Payout Management</h2>
+                <button class="btn" onclick="processAllPayouts()" id="processBtn">
+                    Process All Pending Payouts
+                </button>
+                
+                <div style="margin-top: 1rem;">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Pending</h3>
+                            <div class="value" id="pendingPayoutCount">0</div>
+                            <div class="subtitle" id="pendingPayoutAmount">₹0</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <h3>Processing</h3>
+                            <div class="value" id="processingPayoutCount">0</div>
+                            <div class="subtitle" id="processingPayoutAmount">₹0</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <h3>Completed</h3>
+                            <div class="value" id="completedPayoutCount">0</div>
+                            <div class="subtitle" id="completedPayoutAmount">₹0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Top Sellers -->
+            <div class="section">
+                <h2>Top Sellers</h2>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Seller</th>
+                            <th>Total Earnings</th>
+                            <th>Orders</th>
+                            <th>Payout Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topSellers">
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Platform Settings -->
+            <div class="section">
+                <h2>Platform Settings</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Commission Rate</h3>
+                        <div class="value" id="commissionRate">15%</div>
+                        <div class="subtitle">On online payments</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <h3>COD Commission</h3>
+                        <div class="value" id="codCommissionRate">0%</div>
+                        <div class="subtitle">On cash on delivery</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <h3>Active Sellers</h3>
+                        <div class="value" id="activeSellers">0</div>
+                        <div class="subtitle" id="totalSellers">of 0 total</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <button class="refresh-btn" onclick="loadDashboard()" title="Refresh Dashboard">
+        ↻
+    </button>
+    
+    <script>
+        let dashboardData = null;
+        
+        async function loadDashboard() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('dashboard').style.display = 'none';
+                document.getElementById('error').style.display = 'none';
+                
+                const response = await fetch('/api/admin-dashboard/');
+                const result = await response.json();
+                
+                if (result.success) {
+                    dashboardData = result.data;
+                    updateDashboard();
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Error loading dashboard: ' + error.message;
+            }
+        }
+        
+        function updateDashboard() {
+            const data = dashboardData;
+            
+            // Revenue Stats
+            document.getElementById('todayRevenue').textContent = '₹' + data.revenue.today.platform_commission.toLocaleString();
+            document.getElementById('todayOrders').textContent = data.revenue.today.total_orders + ' orders';
+            
+            document.getElementById('monthlyRevenue').textContent = '₹' + data.revenue.this_month.platform_commission.toLocaleString();
+            document.getElementById('monthlyOrders').textContent = data.revenue.this_month.total_orders + ' orders';
+            
+            document.getElementById('totalRevenue').textContent = '₹' + data.revenue.all_time.platform_commission.toLocaleString();
+            document.getElementById('totalOrders').textContent = data.revenue.all_time.total_orders + ' orders';
+            
+            // Payout Stats
+            document.getElementById('pendingPayouts').textContent = '₹' + data.payouts.pending.total_amount.toLocaleString();
+            document.getElementById('pendingCount').textContent = data.payouts.pending.count + ' sellers';
+            
+            document.getElementById('pendingPayoutCount').textContent = data.payouts.pending.count;
+            document.getElementById('pendingPayoutAmount').textContent = '₹' + data.payouts.pending.total_amount.toLocaleString();
+            
+            document.getElementById('processingPayoutCount').textContent = data.payouts.processing.count;
+            document.getElementById('processingPayoutAmount').textContent = '₹' + data.payouts.processing.total_amount.toLocaleString();
+            
+            document.getElementById('completedPayoutCount').textContent = data.payouts.completed.count;
+            document.getElementById('completedPayoutAmount').textContent = '₹' + data.payouts.completed.total_amount.toLocaleString();
+            
+            // Platform Settings
+            document.getElementById('commissionRate').textContent = data.platform.commission_rate + '%';
+            document.getElementById('codCommissionRate').textContent = data.platform.cod_commission_rate + '%';
+            document.getElementById('activeSellers').textContent = data.sellers.active_sellers;
+            document.getElementById('totalSellers').textContent = 'of ' + data.sellers.total_sellers + ' total';
+            
+            // Top Sellers
+            const topSellersTable = document.getElementById('topSellers');
+            topSellersTable.innerHTML = '';
+            
+            data.sellers.top_earners.forEach(seller => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${seller.username}<br><small>${seller.email}</small></td>
+                    <td>₹${seller.total_earnings.toLocaleString()}</td>
+                    <td>${seller.total_orders}</td>
+                    <td><span class="payout-status completed">Active</span></td>
+                `;
+                topSellersTable.appendChild(row);
+            });
+        }
+        
+        async function processAllPayouts() {
+            try {
+                const btn = document.getElementById('processBtn');
+                btn.disabled = true;
+                btn.textContent = 'Processing...';
+                
+                const response = await fetch('/api/process-payouts/', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('success').style.display = 'block';
+                    document.getElementById('success').textContent = result.data.message;
+                    setTimeout(() => {
+                        document.getElementById('success').style.display = 'none';
+                        loadDashboard();
+                    }, 3000);
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Error processing payouts: ' + error.message;
+            } finally {
+                const btn = document.getElementById('processBtn');
+                btn.disabled = false;
+                btn.textContent = 'Process All Pending Payouts';
+            }
+        }
+        
+        // Load dashboard on page load
+        loadDashboard();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>
