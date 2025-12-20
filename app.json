@@ -1,50 +1,45 @@
 {
   "expo": {
     "name": "Flairies",
-    "slug": "flairies",
+    "slug": "flairies-new",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "flairiesexpo",
+    "scheme": "flairies",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "entryPoint": "./App.js",
+    "splash": {
+      "image": "./assets/images/Logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/Logo.png",
-        "backgroundImage": "./assets/images/Logo.png",
-        "monochromeImage": "./assets/images/Logo.png"
+        "backgroundColor": "#E6F4FE"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.flairies"
+      "package": "com.anonymous.flairies",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyB-yfhQeeReYRg1DNbJG4K_OpqKPiN3zk0"
+        }
+      }
     },
     "web": {
+      "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/Logo.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ]
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "9c67e8cc-e259-41cb-8fe4-6fc16389fcd0"
+      }
     }
   }
 }
