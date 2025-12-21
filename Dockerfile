@@ -23,4 +23,6 @@ RUN python manage.py migrate --settings=flairies_backend.settings || echo "Migra
 EXPOSE 8000
 
 # Just start the server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py runserver 0.0.0.0:$PORT"]
+
+
