@@ -19,8 +19,5 @@ COPY backend/ .
 # Expose port
 EXPOSE 8000
 
-# Use Django development server (more reliable for debugging)
-CMD python manage.py migrate && \
-    python manage.py collectstatic --noinput && \
-    echo "Starting Django development server on port $PORT..." && \
-    python manage.py runserver 0.0.0.0:$PORT
+# Just run the server (skip collectstatic for now)
+CMD python manage.py migrate && python manage.py runserver 0.0.0.0:$PORT
