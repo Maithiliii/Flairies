@@ -5,11 +5,27 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from django.db import models
+from django.http import JsonResponse
 from decimal import Decimal
 import uuid
 from .serializers import SignupSerializer, ItemSerializer, UserProfileSerializer, OrderSerializer, PlatformSettingsSerializer
 from .models import Item, ItemImage, UserProfile, Order, PlatformSettings
 from .revenue_analytics import RevenueAnalytics
+
+# Health check endpoint
+@api_view(['GET'])
+def health_check(request):
+    """Simple health check endpoint for Railway"""
+    return Response({"status": "healthy", "timestamp": timezone.now()})
+
+# Simple health check for Railway (no auth required)
+def simple_health(request):
+    """Simple health check that returns 200 OK"""
+    return JsonResponse({
+        "message": "Flairies API is running!",
+        "status": "success",
+        "timestamp": timezone.now().isoformat()
+    })
 
 # Class-based signup view
 class SignupView(generics.CreateAPIView):
