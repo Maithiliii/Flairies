@@ -19,5 +19,5 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Run migrations, collect static files, and start server
-CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn flairies_backend.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
+# Simple startup command that works
+CMD python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
