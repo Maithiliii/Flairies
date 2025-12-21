@@ -16,12 +16,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY backend/ .
 
+# Run migrations during build (not runtime)
+RUN python manage.py migrate --settings=flairies_backend.settings || echo "Migration failed, continuing..."
+
 # Expose port
 EXPOSE 8000
 
-# Add debug output and error handling
-CMD python manage.py migrate && \
-    echo "Migrations completed successfully" && \
-    echo "PORT is: $PORT" && \
-    echo "Starting Django server..." && \
-    python manage.py runserver 0.0.0.0:$PORT --verbosity=2
+# Just start the server
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
