@@ -3,12 +3,19 @@
   "main": "index.js",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start",
+    "start": "node deploy-backend.js",
+    "frontend": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "backend:install": "cd backend && pip install -r requirements.txt",
+    "backend:migrate": "cd backend && python manage.py migrate",
+    "backend:collectstatic": "cd backend && python manage.py collectstatic --noinput",
+    "backend:start": "cd backend && python manage.py runserver 0.0.0.0:$PORT",
+    "backend:deploy": "npm run backend:migrate && npm run backend:collectstatic && npm run backend:start",
+    "deploy": "node deploy-backend.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
