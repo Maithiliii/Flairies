@@ -19,5 +19,9 @@ COPY backend/ .
 # Expose port
 EXPOSE 8000
 
-# Just run the server (skip collectstatic for now)
-CMD python manage.py migrate && python manage.py runserver 0.0.0.0:$PORT
+# Add debug output and error handling
+CMD python manage.py migrate && \
+    echo "Migrations completed successfully" && \
+    echo "PORT is: $PORT" && \
+    echo "Starting Django server..." && \
+    python manage.py runserver 0.0.0.0:$PORT --verbosity=2
