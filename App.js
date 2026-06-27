@@ -209,7 +209,7 @@ const webStyles = StyleSheet.create({
   logo: { width: 72, height: 72, marginBottom: 4 },
   brand: { fontSize: 32, fontWeight: "800", color: "#1e0a16", marginBottom: 4 },
   heading: { fontSize: 22, fontWeight: "700", color: "#fe95b4", marginBottom: 10 },
-  sub: { fontSize: 15, color: "#888", textAlign: "center", maxWidth: 320, lineHeight: 22, marginBottom: 32 },
+  sub: { fontSize: 15, color: "#888", textAlign: "center", maxWidth: 400, lineHeight: 22, marginBottom: 32 },
   qrBox: {
     backgroundColor: "#fff",
     padding: 20,
