@@ -24,6 +24,7 @@ serve(async (req) => {
     );
     const { data: { user }, error: authError } = await userSupabase.auth.getUser();
     if (authError || !user) throw new Error("Not authenticated");
+    console.log("Auth OK, user:", user.id);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -70,11 +71,15 @@ serve(async (req) => {
     const grandTotal = total + extraFees;
     const amountInPaise = Math.round(grandTotal * 100);
     const cartId = `CART${Date.now()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    console.log("Total:", total, "Extra fees:", extraFees, "Grand:", grandTotal, "Paise:", amountInPaise);
 
     // Create Razorpay order (single order for full cart total)
     let razorpayOrderId: string | null = null;
     if (payment_method === "online") {
-      const auth = btoa(`${Deno.env.get("RAZORPAY_KEY_ID")}:${Deno.env.get("RAZORPAY_KEY_SECRET")}`);
+      const keyId = Deno.env.get("RAZORPAY_KEY_ID") || "";
+      const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET") || "";
+      console.log("Razorpay key present:", !!keyId, "Secret present:", !!keySecret);
+      const auth = btoa(`${keyId}:${keySecret}`);
       const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
@@ -85,8 +90,14 @@ serve(async (req) => {
           notes: { cart_id: cartId, buyer_id: user.id, item_count: String(items.length) },
         }),
       });
-      if (!rzpRes.ok) throw new Error(`Razorpay error: ${await rzpRes.text()}`);
-      razorpayOrderId = (await rzpRes.json()).id;
+      if (!rzpRes.ok) {
+        const errText = await rzpRes.text();
+        console.error("Razorpay API error:", rzpRes.status, errText);
+        throw new Error(`Razorpay error (${rzpRes.status}): ${errText}`);
+      }
+      const rzpData = await rzpRes.json();
+      razorpayOrderId = rzpData.id;
+      console.log("Razorpay order created:", razorpayOrderId);
     }
 
     // Insert one orders row per cart item, all sharing the same cart_id
@@ -117,7 +128,11 @@ serve(async (req) => {
     });
 
     const { error: insertError } = await supabase.from("orders").insert(orderRows);
-    if (insertError) throw new Error(`DB error: ${insertError.message}`);
+    if (insertError) {
+      console.error("DB insert error:", insertError.message);
+      throw new Error(`DB error: ${insertError.message}`);
+    }
+    console.log("Orders saved, cartId:", cartId, "count:", orderRows.length);
 
     if (payment_method === "cod") {
       await supabase.from("items").update({ is_available: false }).in("id", itemIds);

@@ -73,6 +73,7 @@ const CheckoutScreen = () => {
   const [pincode, setPincode] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const payingRef = useRef(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [locationConfirmed, setLocationConfirmed] = useState(false);
@@ -185,6 +186,7 @@ const CheckoutScreen = () => {
   };
 
   const handlePayment = async () => {
+    if (payingRef.current) return;
     if (!user) { Alert.alert("Error", "Please login to continue"); return; }
     if (!name.trim() || !phone.trim()) { Alert.alert("Error", "Please fill name and phone"); return; }
     if (!locationConfirmed && (!houseNo || !street || !city || !addressState || !pincode)) {
@@ -193,13 +195,15 @@ const CheckoutScreen = () => {
     }
     if (items.length === 0) { Alert.alert("Error", "Your cart is empty"); return; }
 
+    payingRef.current = true;
     setLoading(true);
     try {
       await processOnlinePayment(items);
     } catch (error: any) {
-      Alert.alert("Error", error?.message || "Something went wrong. Please try again.");
+      Alert.alert("Payment Error", error?.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
+      payingRef.current = false;
     }
   };
 
@@ -240,9 +244,13 @@ const CheckoutScreen = () => {
     });
 
     if (error || data?.error) {
-      Alert.alert("Error", data?.error || error?.message || "Failed to create order");
+      const msg = data?.error || (error as any)?.message || "Failed to create order";
+      console.error("[Checkout] Edge function error:", msg);
+      Alert.alert("Error", msg);
       return;
     }
+
+    console.log("[Checkout] Order created:", data?.razorpay_order_id, "amount_paise:", data?.amount_in_paise);
 
     const options = {
       description: `Flairies — ${data.item_count} item${data.item_count > 1 ? "s" : ""}`,
@@ -262,36 +270,40 @@ const CheckoutScreen = () => {
         .then((paymentData: any) => verifyAndComplete(paymentData, data.cart_id))
         .catch((err: any) => Alert.alert("Payment Failed", err?.description || "Payment was cancelled"));
     } else {
-      // Web: load Razorpay checkout.js and open in browser
-      await new Promise<void>((resolve) => {
+      // Web: load Razorpay checkout.js and open modal
+      await new Promise<void>((resolve, reject) => {
         const openRzp = () => {
-          const rzp = new (window as any).Razorpay({
-            ...options,
-            handler: async (paymentData: any) => {
-              await verifyAndComplete(paymentData, data.cart_id);
-              resolve();
-            },
-            modal: {
-              ondismiss: () => {
-                Alert.alert("Payment Cancelled", "You closed the payment window.");
+          try {
+            console.log("[Checkout] Opening Razorpay modal...");
+            const rzp = new (window as any).Razorpay({
+              ...options,
+              handler: async (paymentData: any) => {
+                try {
+                  await verifyAndComplete(paymentData, data.cart_id);
+                } catch (e: any) {
+                  Alert.alert("Error", e.message || "Verification failed");
+                }
                 resolve();
               },
-            },
-          });
-          rzp.open();
+              modal: { ondismiss: () => resolve() },
+            });
+            rzp.open();
+            console.log("[Checkout] Razorpay modal launched");
+          } catch (e: any) {
+            console.error("[Checkout] Razorpay constructor error:", e);
+            reject(new Error("Payment gateway failed to open: " + (e?.message || "unknown error")));
+          }
         };
 
         if ((window as any).Razorpay) {
           openRzp();
         } else {
+          console.log("[Checkout] Loading checkout.js...");
           const script = document.createElement("script");
           script.src = "https://checkout.razorpay.com/v1/checkout.js";
           script.async = true;
-          script.onload = openRzp;
-          script.onerror = () => {
-            Alert.alert("Error", "Could not load payment gateway. Please check your internet connection.");
-            resolve();
-          };
+          script.onload = () => { console.log("[Checkout] checkout.js loaded"); openRzp(); };
+          script.onerror = () => reject(new Error("Could not load payment gateway. Check your internet connection."));
           document.head.appendChild(script);
         }
       });
