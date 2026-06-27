@@ -1,6 +1,6 @@
 # Flairies
 
-**Flairies** is a cross-platform fashion resale app (mobile & web) built for girls who want to give their wardrobe a second life. Buy, sell, rent, or donate pre-loved clothes and accessories — all within a community that values sustainability, affordability, and girlhood empowerment. Sellers earn from their closet, renters access fashion affordably, and donors can connect their unused pieces directly to NGOs and charitable organisations.
+**Flairies** is a web app built for girls who want to give their wardrobe a second life. Buy, sell, rent, or donate pre-loved clothes and accessories, all within a community that values sustainability, affordability, and girlhood empowerment. Sellers earn from their closet, renters access fashion affordably, and donors can connect their unused pieces directly to NGOs and charitable organisations.
 
 ## Features
 
@@ -16,7 +16,7 @@
 **Search & Filter:** Browse and filter listings by category, size, price, condition, and availability.  
 **Favorites:** Save and revisit items you love with a persistent favorites list.  
 **Orders & Reviews:** Track purchase history, order status, and leave ratings for sellers post-purchase.  
-**Location Services:** Google Maps–based location picker with reverse geocoding for accurate delivery address selection.  
+**Location Services:** Google Maps based location picker with reverse geocoding for accurate delivery address selection.  
 **Notifications:** In-app and push notifications for purchases, messages, and order updates.  
 
 
