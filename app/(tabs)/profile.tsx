@@ -14,7 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { supabase, getImageUrl, uploadImage } from "../../lib/supabase";
 import {
   Landmark, PackageOpen, IndianRupee, MapPin, LogOut,
-  ChevronRight, ChevronDown, ChevronUp, Heart, Plus, Star, Info, Bookmark,
+  ChevronRight, ChevronDown, ChevronUp, Heart, Plus, Star, Info, Bookmark, Pencil,
 } from "lucide-react-native";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -184,7 +184,7 @@ const ProfileScreen = () => {
                 <Text style={styles.profileInitial}>{user.name.charAt(0).toUpperCase()}</Text>
               )}
             </View>
-            <View style={styles.editBadge}><Text style={styles.editIcon}>✏️</Text></View>
+            <View style={styles.editBadge}><Pencil size={13} color="#fe95b4" strokeWidth={2.5} /></View>
           </TouchableOpacity>
 
           {/* Rating badge — top right of card */}
@@ -406,7 +406,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff", alignItems: "center", justifyContent: "center",
     borderWidth: 2, borderColor: "#fe95b4",
   },
-  editIcon: { fontSize: 13 },
   name: { fontSize: 20, fontWeight: "700", color: "#1e0a16", marginBottom: 6, textAlign: "center" },
   contactText: { fontSize: 12, color: "#999", textAlign: "center", paddingHorizontal: 16, marginBottom: 20 },
   ratingBadge: {

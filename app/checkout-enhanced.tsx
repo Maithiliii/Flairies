@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,29 +10,23 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import ConfirmationModal from "../components/ConfirmationModal";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { Trash2 } from "lucide-react-native";
 import { RootState } from "../store";
-import { clearCart, removeFromCart, CartItem } from "../slices/cartSlice";
+import { clearCart } from "../slices/cartSlice";
 import { supabase } from "../lib/supabase";
 import ScreenHeader from "../components/ScreenHeader";
+import LocationPicker from "../components/LocationPicker";
 import * as Location from "expo-location";
 // @ts-ignore
 import RazorpayCheckout from "react-native-razorpay";
+// @ts-ignore
+import { RAZORPAY_KEY_ID } from "@env";
 
-const PLATFORM_COMMISSION_RATE = 0.15; // 15% on online payments
+const DELIVERY_FEE = 49;
+const FREE_DELIVERY_THRESHOLD = 500;
+const DELIVERY_GST_RATE = 0.18;
 
-let MapView: any = null;
-let Marker: any = null;
-let PROVIDER_GOOGLE: any = null;
-try {
-  const Maps = require("react-native-maps");
-  MapView = Maps.default;
-  Marker = Maps.Marker;
-  PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
-} catch (e) {}
 
 const CheckoutScreen = () => {
   const route = useRoute();
@@ -54,19 +48,37 @@ const CheckoutScreen = () => {
   const [addressState, setAddressState] = useState("");
   const [pincode, setPincode] = useState("");
 
-  const [deleteTarget, setDeleteTarget] = useState<CartItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [locationConfirmed, setLocationConfirmed] = useState(false);
   const [confirmedAddress, setConfirmedAddress] = useState("");
+  const [initialLocation, setInitialLocation] = useState<{ latitude: number; longitude: number } | undefined>(undefined);
+  const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number; address?: any } | null>(null);
 
-  const [region, setRegion] = useState({
-    latitude: 19.076, longitude: 72.8777, latitudeDelta: 0.01, longitudeDelta: 0.01,
-  });
-  const [markerPosition, setMarkerPosition] = useState({
-    latitude: 19.076, longitude: 72.8777,
-  });
+  useEffect(() => {
+    if (user) fetchSavedAddress();
+  }, [user?.id]);
+
+  const fetchSavedAddress = async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("address, latitude, longitude")
+      .eq("id", user!.id)
+      .single();
+
+    if (!data?.address) return;
+
+    // Auto-confirm the saved address so Pay Now works immediately
+    setConfirmedAddress(data.address);
+    setLocationConfirmed(true);
+
+    if (data.latitude && data.longitude) {
+      // Also store coords so "Change Address" can re-open map at the right spot
+      setInitialLocation({ latitude: data.latitude, longitude: data.longitude });
+      setSelectedLocation({ latitude: data.latitude, longitude: data.longitude });
+    }
+  };
 
   const total = items.reduce((sum, item) => {
     const price = item.listing_type === "rent"
@@ -81,8 +93,9 @@ const CheckoutScreen = () => {
     return "BUY";
   }
 
-  const commission = total * PLATFORM_COMMISSION_RATE;
-  const sellerEarnings = total - commission;
+  const deliveryFee = total >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+  const deliveryGst = Math.round(deliveryFee * DELIVERY_GST_RATE);
+  const grandTotal = total + deliveryFee + deliveryGst;
 
   const getFullAddress = () => {
     if (locationConfirmed && confirmedAddress) return confirmedAddress;
@@ -99,19 +112,8 @@ const CheckoutScreen = () => {
         Alert.alert("Permission Denied", "Location permission is required");
         return;
       }
-      const location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-      setRegion({ latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 });
-      setMarkerPosition({ latitude, longitude });
-      const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (addresses.length > 0) {
-        const addr = addresses[0];
-        setStreet(addr.street || "");
-        setCity(addr.city || "");
-        setAddressState(addr.region || "");
-        setPincode(addr.postalCode || "");
-        setLandmark(addr.subregion || "");
-      }
+      const loc = await Location.getCurrentPositionAsync({});
+      setInitialLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       setShowMap(true);
     } catch {
       Alert.alert("Error", "Failed to get current location");
@@ -120,47 +122,36 @@ const CheckoutScreen = () => {
     }
   };
 
-  const handleMapPress = async (event: any) => {
-    const { latitude, longitude } = event.nativeEvent.coordinate;
-    setMarkerPosition({ latitude, longitude });
-    try {
-      const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (addresses.length > 0) {
-        const addr = addresses[0];
-        setStreet(addr.street || "");
-        setCity(addr.city || "");
-        setAddressState(addr.region || "");
-        setPincode(addr.postalCode || "");
-        setLandmark(addr.subregion || "");
-      }
-    } catch {}
+  const handleLocationSelect = (loc: { latitude: number; longitude: number; address?: any }) => {
+    setSelectedLocation(loc);
+    if (loc.address) {
+      const addr = loc.address;
+      setStreet(addr.street || "");
+      setCity(addr.city || "");
+      setAddressState(addr.region || "");
+      setPincode(addr.postalCode || "");
+      setLandmark(addr.subregion || "");
+    }
   };
 
-  const confirmLocation = async () => {
-    try {
-      const addresses = await Location.reverseGeocodeAsync({
-        latitude: markerPosition.latitude,
-        longitude: markerPosition.longitude,
-      });
-      if (addresses.length > 0) {
-        const addr = addresses[0];
-        const fullAddress = [
-          houseNo || addr.name,
-          addr.street,
-          addr.subregion,
-          addr.city,
-          addr.region,
-          addr.postalCode,
-        ]
-          .filter(Boolean)
-          .join(", ");
-        setConfirmedAddress(fullAddress);
-        setLocationConfirmed(true);
-        Alert.alert("Location Confirmed", "Delivery address set from your location.", [{ text: "OK" }]);
-      }
-    } catch {
-      Alert.alert("Error", "Failed to confirm location. Please try again.");
+  const confirmLocation = () => {
+    if (!selectedLocation) {
+      Alert.alert("No location selected", "Please tap on the map to pin your location.");
+      return;
     }
+    const addr = selectedLocation.address || {};
+    const fullAddress = [
+      houseNo || addr.name,
+      addr.street,
+      addr.subregion,
+      addr.city,
+      addr.region,
+      addr.postalCode,
+    ].filter(Boolean).join(", ");
+    // Use geocoded result; if pin wasn't moved (pre-filled from profile), fall back to saved address string
+    setConfirmedAddress(fullAddress || confirmedAddress || "Location confirmed");
+    setLocationConfirmed(true);
+    setShowMap(false);
   };
 
   const handlePayment = async () => {
@@ -175,11 +166,34 @@ const CheckoutScreen = () => {
     setLoading(true);
     try {
       await processOnlinePayment(items);
-    } catch (error) {
-      Alert.alert("Error", "Something went wrong. Please try again.");
+    } catch (error: any) {
+      Alert.alert("Error", error?.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const verifyAndComplete = async (paymentData: any, cartId: string) => {
+    const { data: verifyData, error: verifyError } = await supabase.functions.invoke(
+      "verify-razorpay-payment",
+      {
+        body: {
+          razorpay_payment_id: paymentData.razorpay_payment_id,
+          razorpay_order_id: paymentData.razorpay_order_id,
+          razorpay_signature: paymentData.razorpay_signature,
+          cart_id: cartId,
+        },
+      }
+    );
+    if (verifyError || verifyData?.error) {
+      Alert.alert("Verification Issue", "Payment received but verification failed. Contact support with cart ID: " + cartId);
+      return;
+    }
+    dispatch(clearCart());
+    Alert.alert("Payment Successful!", "Your order has been placed. Items ship separately from each seller.", [
+      { text: "View Orders", onPress: () => navigation.navigate("Orders" as never) },
+      { text: "Continue Shopping", onPress: () => navigation.navigate("Home" as never) },
+    ]);
   };
 
   const processOnlinePayment = async (cartItems: any[]) => {
@@ -190,6 +204,8 @@ const CheckoutScreen = () => {
         buyer_phone: phone,
         delivery_address: getFullAddress(),
         payment_method: "online",
+        delivery_fee: deliveryFee,
+        gst_amount: deliveryGst,
       },
     });
 
@@ -201,7 +217,7 @@ const CheckoutScreen = () => {
     const options = {
       description: `Flairies — ${data.item_count} item${data.item_count > 1 ? "s" : ""}`,
       currency: "INR",
-      key: data.key_id,
+      key: data.key_id || RAZORPAY_KEY_ID,
       amount: data.amount_in_paise,
       name: "Flairies",
       order_id: data.razorpay_order_id,
@@ -209,35 +225,47 @@ const CheckoutScreen = () => {
       theme: { color: "#fe95b4" },
     };
 
-    RazorpayCheckout.open(options)
-      .then(async (paymentData: any) => {
-        const { data: verifyData, error: verifyError } =
-          await supabase.functions.invoke("verify-razorpay-payment", {
-            body: {
-              razorpay_payment_id: paymentData.razorpay_payment_id,
-              razorpay_order_id: paymentData.razorpay_order_id,
-              razorpay_signature: paymentData.razorpay_signature,
-              cart_id: data.cart_id,
+    const useNative = RazorpayCheckout && typeof RazorpayCheckout.open === "function";
+
+    if (useNative) {
+      RazorpayCheckout.open(options)
+        .then((paymentData: any) => verifyAndComplete(paymentData, data.cart_id))
+        .catch((err: any) => Alert.alert("Payment Failed", err?.description || "Payment was cancelled"));
+    } else {
+      // Web: load Razorpay checkout.js and open in browser
+      await new Promise<void>((resolve) => {
+        const openRzp = () => {
+          const rzp = new (window as any).Razorpay({
+            ...options,
+            handler: async (paymentData: any) => {
+              await verifyAndComplete(paymentData, data.cart_id);
+              resolve();
+            },
+            modal: {
+              ondismiss: () => {
+                Alert.alert("Payment Cancelled", "You closed the payment window.");
+                resolve();
+              },
             },
           });
+          rzp.open();
+        };
 
-        if (verifyError || verifyData?.error) {
-          Alert.alert(
-            "Verification Issue",
-            "Payment received but verification failed. Contact support with cart ID: " + data.cart_id
-          );
-          return;
+        if ((window as any).Razorpay) {
+          openRzp();
+        } else {
+          const script = document.createElement("script");
+          script.src = "https://checkout.razorpay.com/v1/checkout.js";
+          script.async = true;
+          script.onload = openRzp;
+          script.onerror = () => {
+            Alert.alert("Error", "Could not load payment gateway. Please check your internet connection.");
+            resolve();
+          };
+          document.head.appendChild(script);
         }
-
-        dispatch(clearCart());
-        Alert.alert("Payment Successful!", "Your order has been placed. Items ship separately from each seller.", [
-          { text: "View Orders", onPress: () => navigation.navigate("Orders" as never) },
-          { text: "Continue Shopping", onPress: () => navigation.navigate("Home" as never) },
-        ]);
-      })
-      .catch((err: any) => {
-        Alert.alert("Payment Failed", err?.description || "Payment was cancelled");
       });
+    }
   };
 
   return (
@@ -265,20 +293,25 @@ const CheckoutScreen = () => {
                       <Text style={styles.typeBadgeText}>{typeBadgeLabel(item.listing_type)}</Text>
                     </View>
                   </View>
+                  {item.listing_type !== "rent" && (item.size || item.condition) && (
+                    <View style={styles.tagsRow}>
+                      {item.size ? (
+                        <View style={styles.tag}><Text style={styles.tagText}>{item.size}</Text></View>
+                      ) : null}
+                      {item.condition ? (
+                        <View style={styles.tag}>
+                          <Text style={styles.tagText}>
+                            {{ new: "New", like_new: "Like New", good: "Good", used: "Used" }[item.condition as string] ?? item.condition}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
                   <Text style={styles.itemPrice}>
                     {item.listing_type === "rent"
                       ? `₹${(parseFloat(item.rent_price || "0") * (item.rent_days || 1)).toFixed(0)} (₹${item.rent_price}/day × ${item.rent_days || 1}d)`
                       : `₹${item.price}`}
                   </Text>
-                  <View style={styles.itemBottomRow}>
-                    <View />
-                    <TouchableOpacity
-                      onPress={(e) => { e.stopPropagation(); setDeleteTarget(item as CartItem); }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Trash2 size={16} color="#e53935" strokeWidth={2} />
-                    </TouchableOpacity>
-                  </View>
                 </View>
               </View>
             </TouchableOpacity>
@@ -288,7 +321,7 @@ const CheckoutScreen = () => {
         {/* Contact Details */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Details</Text>
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>Full Name <Text style={styles.required}>*</Text></Text>
           <TextInput
             style={styles.input}
             value={name}
@@ -296,7 +329,7 @@ const CheckoutScreen = () => {
             placeholder="Enter your name"
             placeholderTextColor="#555"
           />
-          <Text style={styles.label}>Phone Number</Text>
+          <Text style={styles.label}>Phone Number <Text style={styles.required}>*</Text></Text>
           <TextInput
             style={styles.input}
             value={phone}
@@ -311,46 +344,36 @@ const CheckoutScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Delivery Address</Text>
 
-          <TouchableOpacity
-            style={styles.locationButton}
-            onPress={getCurrentLocation}
-            disabled={locationLoading}
-          >
-            {locationLoading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.locationButtonText}>Use Current Location</Text>
-            )}
-          </TouchableOpacity>
-
-          {!showMap && (
-            <View style={styles.orContainer}>
-              <View style={styles.orLine} />
-              <Text style={styles.orText}>OR</Text>
-              <View style={styles.orLine} />
-            </View>
-          )}
-
-          {showMap && MapView && (
-            <View style={styles.mapContainer}>
-              <MapView
-                provider={PROVIDER_GOOGLE}
-                style={styles.map}
-                region={region}
-                onPress={handleMapPress}
+          {!showMap && !locationConfirmed && (
+            <>
+              <TouchableOpacity
+                style={styles.locationButton}
+                onPress={getCurrentLocation}
+                disabled={locationLoading}
               >
-                <Marker coordinate={markerPosition} draggable onDragEnd={handleMapPress} />
-              </MapView>
-              <Text style={styles.mapHint}>Tap or drag pin to adjust location</Text>
-              <TouchableOpacity style={styles.confirmLocationButton} onPress={confirmLocation}>
-                <Text style={styles.confirmLocationText}>Confirm This Location</Text>
+                {locationLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.locationButtonText}>Use Current Location</Text>
+                )}
               </TouchableOpacity>
-            </View>
+
+              <View style={styles.orContainer}>
+                <View style={styles.orLine} />
+                <Text style={styles.orText}>OR</Text>
+                <View style={styles.orLine} />
+              </View>
+            </>
           )}
 
-          {showMap && !MapView && (
-            <View style={styles.mapFallback}>
-              <Text style={styles.mapFallbackText}>Location detected</Text>
+          {showMap && (
+            <View>
+              <View style={styles.mapContainer}>
+                <LocationPicker
+                  initialLocation={initialLocation}
+                  onLocationSelect={handleLocationSelect}
+                />
+              </View>
               <TouchableOpacity style={styles.confirmLocationButton} onPress={confirmLocation}>
                 <Text style={styles.confirmLocationText}>Confirm This Location</Text>
               </TouchableOpacity>
@@ -363,16 +386,16 @@ const CheckoutScreen = () => {
               <Text style={styles.confirmedLocationText}>{confirmedAddress}</Text>
               <TouchableOpacity
                 style={styles.changeLocationButton}
-                onPress={() => { setLocationConfirmed(false); setConfirmedAddress(""); setShowMap(false); }}
+                onPress={() => { setLocationConfirmed(false); setConfirmedAddress(""); setShowMap(false); setSelectedLocation(null); setInitialLocation(undefined); }}
               >
                 <Text style={styles.changeLocationText}>Change Address</Text>
               </TouchableOpacity>
             </View>
           )}
 
-          {!locationConfirmed && (
+          {!locationConfirmed && !showMap && (
             <>
-              {!showMap && <Text style={styles.manualEntryTitle}>Enter Address Manually</Text>}
+              <Text style={styles.manualEntryTitle}>Enter Address Manually</Text>
               <Text style={styles.label}>House/Flat No. *</Text>
               <TextInput style={styles.input} value={houseNo} onChangeText={setHouseNo} placeholder="House/flat number" placeholderTextColor="#555" />
               <Text style={styles.label}>Street/Area *</Text>
@@ -400,20 +423,28 @@ const CheckoutScreen = () => {
           <Text style={styles.sectionTitle}>Price Breakdown</Text>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Item Total</Text>
-            <Text style={styles.priceValue}>₹{total.toFixed(2)}</Text>
+            <Text style={styles.priceValue}>₹{total.toFixed(0)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Platform Fee (15%)</Text>
-            <Text style={styles.priceValue}>₹{commission.toFixed(2)}</Text>
+            <Text style={styles.priceLabel}>Delivery Charges</Text>
+            <Text style={deliveryFee === 0 ? styles.priceValueFree : styles.priceValue}>
+              {deliveryFee === 0 ? "Free" : `₹${deliveryFee}`}
+            </Text>
           </View>
+          {deliveryGst > 0 && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>GST (18% on delivery)</Text>
+              <Text style={styles.priceValue}>₹{deliveryGst}</Text>
+            </View>
+          )}
           <View style={styles.divider} />
           <View style={styles.priceRow}>
             <Text style={styles.totalLabel}>You Pay</Text>
-            <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>₹{grandTotal.toFixed(0)}</Text>
           </View>
-          <Text style={styles.note}>
-            Sellers receive ₹{sellerEarnings.toFixed(2)} total after 15% platform fee. Items ship separately from each seller.
-          </Text>
+          {total < FREE_DELIVERY_THRESHOLD && (
+            <Text style={styles.note}>Add ₹{(FREE_DELIVERY_THRESHOLD - total).toFixed(0)} more for free delivery</Text>
+          )}
         </View>
 
         <TouchableOpacity
@@ -429,19 +460,6 @@ const CheckoutScreen = () => {
         </TouchableOpacity>
       </ScrollView>
 
-      <ConfirmationModal
-        visible={!!deleteTarget}
-        title="Remove Item"
-        message="This item will be removed from your cart."
-        confirmText="Remove"
-        cancelText="Cancel"
-        confirmColor="#e53935"
-        onConfirm={() => {
-          if (deleteTarget) dispatch(removeFromCart(deleteTarget.id));
-          setDeleteTarget(null);
-        }}
-        onCancel={() => setDeleteTarget(null)}
-      />
     </View>
   );
 };
@@ -464,34 +482,32 @@ const styles = StyleSheet.create({
   typeBadgeText: {
     fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.2, color: "#fe95b4",
   },
-  itemPrice: { fontSize: 13, fontWeight: "700", color: "#fe95b4", marginBottom: 6 },
-  itemBottomRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-  },
+  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 4, marginBottom: 4 },
+  tag: { backgroundColor: "#fff0ec", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  tagText: { fontSize: 11, fontWeight: "600", color: "#b06080" },
+  itemPrice: { fontSize: 13, fontWeight: "700", color: "#fe95b4", marginBottom: 4 },
   label: { fontSize: 14, fontWeight: "600", color: "#4b2a36", marginTop: 12, marginBottom: 8 },
+  required: { color: "#e53935", fontWeight: "700" },
   input: { borderWidth: 1, borderColor: "#e0e0e0", padding: 14, borderRadius: 10, fontSize: 15, backgroundColor: "#fafafa", color: "#333" },
   locationButton: { backgroundColor: "#fe95b4", padding: 14, borderRadius: 12, alignItems: "center", justifyContent: "center", marginBottom: 16 },
   locationButtonText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   orContainer: { flexDirection: "row", alignItems: "center", marginVertical: 20 },
   orLine: { flex: 1, height: 2, backgroundColor: "#d0d0d0" },
   orText: { marginHorizontal: 16, fontSize: 14, fontWeight: "700", color: "#999" },
-  mapContainer: { marginBottom: 16 },
-  map: { width: "100%", height: 200, borderRadius: 12 },
-  mapHint: { fontSize: 11, color: "#999", textAlign: "center", marginTop: 6, marginBottom: 8 },
-  mapFallback: { backgroundColor: "#e8f5e9", padding: 16, borderRadius: 12, alignItems: "center", marginBottom: 16 },
-  mapFallbackText: { fontSize: 14, fontWeight: "700", color: "#2e7d32", marginBottom: 12 },
+  mapContainer: { height: 300, borderRadius: 14, overflow: "hidden", marginBottom: 12 },
   confirmLocationButton: { backgroundColor: "#4caf50", paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, alignItems: "center" },
   confirmLocationText: { color: "#fff", fontSize: 14, fontWeight: "700" },
   confirmedLocationContainer: { backgroundColor: "#e8f5e9", padding: 16, borderRadius: 12, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: "#4caf50" },
   confirmedLocationTitle: { fontSize: 15, fontWeight: "700", color: "#2e7d32", marginBottom: 8 },
   confirmedLocationText: { fontSize: 14, color: "#2e7d32", lineHeight: 20, marginBottom: 12 },
-  changeLocationButton: { backgroundColor: "#fe95b4", paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignSelf: "flex-start" },
+  changeLocationButton: { backgroundColor: "#4caf50", paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignSelf: "flex-start" },
   changeLocationText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   manualEntryTitle: { fontSize: 15, fontWeight: "700", color: "#666", marginBottom: 12 },
   row: { flexDirection: "row" },
   priceRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   priceLabel: { fontSize: 14, color: "#666" },
   priceValue: { fontSize: 14, fontWeight: "600", color: "#333" },
+  priceValueFree: { fontSize: 14, fontWeight: "700", color: "#4caf50" },
   divider: { height: 1, backgroundColor: "#e0e0e0", marginVertical: 12 },
   totalLabel: { fontSize: 18, fontWeight: "700", color: "#1f0a1a" },
   totalValue: { fontSize: 18, fontWeight: "800", color: "#fe95b4" },

@@ -181,12 +181,12 @@ function WebMapPicker({ onLocationSelect, initialLocation }: Props) {
 }
 
 // ── Native: Google Maps via WebView HTML ──
-function NativeMapPicker({ onLocationSelect }: Pick<Props, "onLocationSelect">) {
+function NativeMapPicker({ onLocationSelect, initialLocation }: Props) {
   let WebView: any = null;
   try { WebView = require("react-native-webview").WebView; } catch (e) {}
   if (!WebView) return null;
 
-  const html = buildMapHtml(MAPS_API_KEY);
+  const html = buildMapHtml(MAPS_API_KEY, initialLocation);
 
   const handleMessage = (event: any) => {
     try {
@@ -214,7 +214,7 @@ function NativeMapPicker({ onLocationSelect }: Pick<Props, "onLocationSelect">) 
   );
 }
 
-const buildMapHtml = (apiKey: string) => `
+const buildMapHtml = (apiKey: string, initialLocation?: { latitude: number; longitude: number }) => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -240,7 +240,7 @@ const buildMapHtml = (apiKey: string) => `
     var map, marker, geocoder;
     function initMap() {
       geocoder = new google.maps.Geocoder();
-      var def = { lat: 19.076, lng: 72.8777 };
+      var def = ${initialLocation ? `{ lat: ${initialLocation.latitude}, lng: ${initialLocation.longitude} }` : `{ lat: 19.076, lng: 72.8777 }`};
       map = new google.maps.Map(document.getElementById('map'), { center: def, zoom: 15, disableDefaultUI: true, zoomControl: true, clickableIcons: false });
       marker = new google.maps.Marker({ position: def, map: map, draggable: true,
         icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 30 42"><path fill="#EA4335" stroke="white" stroke-width="1.5" d="M15 1C7.8 1 2 6.8 2 14c0 9.5 13 27 13 27S28 23.5 28 14C28 6.8 22.2 1 15 1z"/><circle cx="15" cy="14" r="6" fill="white"/></svg>'), scaledSize: new google.maps.Size(30, 42), anchor: new google.maps.Point(15, 42) } });

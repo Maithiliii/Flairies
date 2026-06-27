@@ -30,7 +30,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { cart_items, buyer_name, buyer_phone, delivery_address, payment_method } =
+    const { cart_items, buyer_name, buyer_phone, delivery_address, payment_method, delivery_fee, gst_amount } =
       await req.json();
 
     if (!cart_items?.length || !buyer_name || !delivery_address || !payment_method) {
@@ -66,7 +66,9 @@ serve(async (req) => {
     }
     if (total <= 0) throw new Error("Invalid total amount");
 
-    const amountInPaise = Math.round(total * 100);
+    const extraFees = Number(delivery_fee || 0) + Number(gst_amount || 0);
+    const grandTotal = total + extraFees;
+    const amountInPaise = Math.round(grandTotal * 100);
     const cartId = `CART${Date.now()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
 
     // Create Razorpay order (single order for full cart total)
@@ -125,7 +127,7 @@ serve(async (req) => {
       JSON.stringify({
         cart_id: cartId,
         razorpay_order_id: razorpayOrderId,
-        amount: total,
+        amount: grandTotal,
         amount_in_paise: amountInPaise,
         key_id: Deno.env.get("RAZORPAY_KEY_ID") || "",
         item_count: items.length,
