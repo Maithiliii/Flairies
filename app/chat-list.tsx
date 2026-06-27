@@ -1,11 +1,34 @@
-import React, { useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated } from "react-native";
 import ScreenHeader from "../components/ScreenHeader";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { RootState } from "../store";
 import { supabase, getImageUrl } from "../lib/supabase";
 import { MessageCircle } from "lucide-react-native";
+
+const SkeletonItem = () => {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <Animated.View style={[styles.conversationCard, { opacity }]}>
+      <View style={[styles.avatarContainer]}>
+        <View style={styles.skeletonAvatar} />
+      </View>
+      <View style={styles.conversationInfo}>
+        <View style={styles.skeletonName} />
+        <View style={styles.skeletonMessage} />
+      </View>
+    </Animated.View>
+  );
+};
 
 interface Conversation {
   id: string;
@@ -21,11 +44,12 @@ const ChatListScreen = () => {
   const navigation = useNavigation();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Re-fetch every time this screen comes into focus so read status is fresh
   useFocusEffect(
     useCallback(() => {
-      if (currentUser) fetchConversations();
+      if (currentUser) { setLoading(true); fetchConversations(); }
     }, [currentUser])
   );
 
@@ -109,6 +133,8 @@ const ChatListScreen = () => {
       setConversations(transformed);
     } catch (error) {
       console.log("Chat list: Unable to fetch conversations");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -125,7 +151,9 @@ const ChatListScreen = () => {
       <ScreenHeader title="Messages" />
 
       <ScrollView style={styles.conversationsList}>
-        {conversations.length === 0 ? (
+        {loading ? (
+          [0,1,2,3,4,5].map((i) => <SkeletonItem key={i} />)
+        ) : conversations.length === 0 ? (
           <View style={styles.emptyState}>
             <MessageCircle size={56} color="#fe95b4" strokeWidth={1.5} style={{ marginBottom: 16 }} />
             <Text style={styles.emptyTitle}>No messages yet</Text>
@@ -212,6 +240,10 @@ const styles = StyleSheet.create({
 
   lastMessage: { fontSize: 13, color: "#999", lineHeight: 17, marginTop: 1 },
   lastMessageUnread: { color: "#444", fontWeight: "600" },
+
+  skeletonAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#f0dde6" },
+  skeletonName: { width: 130, height: 12, borderRadius: 6, backgroundColor: "#f0dde6", marginBottom: 8 },
+  skeletonMessage: { width: 200, height: 10, borderRadius: 5, backgroundColor: "#f5e8ee" },
 });
 
 export default ChatListScreen;
