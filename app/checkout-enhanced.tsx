@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Animated,
 } from "react-native";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -24,6 +25,29 @@ import RazorpayCheckout from "react-native-razorpay";
 import { RAZORPAY_KEY_ID } from "@env";
 
 const DELIVERY_FEE = 49;
+
+const AddressSkeleton = () => {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <Animated.View style={{ opacity }}>
+      <View style={skeletonStyles.bar} />
+      <View style={[skeletonStyles.bar, { width: "70%", marginTop: 10 }]} />
+      <View style={[skeletonStyles.bar, { width: "50%", marginTop: 10, marginBottom: 4 }]} />
+    </Animated.View>
+  );
+};
+
+const skeletonStyles = StyleSheet.create({
+  bar: { height: 14, borderRadius: 7, backgroundColor: "#f0dde6", width: "100%" },
+});
 const FREE_DELIVERY_THRESHOLD = 500;
 const DELIVERY_GST_RATE = 0.18;
 
@@ -55,28 +79,31 @@ const CheckoutScreen = () => {
   const [confirmedAddress, setConfirmedAddress] = useState("");
   const [initialLocation, setInitialLocation] = useState<{ latitude: number; longitude: number } | undefined>(undefined);
   const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number; address?: any } | null>(null);
+  const [addressLoading, setAddressLoading] = useState(true);
 
   useEffect(() => {
     if (user) fetchSavedAddress();
   }, [user?.id]);
 
   const fetchSavedAddress = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("address, latitude, longitude")
-      .eq("id", user!.id)
-      .single();
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("address, latitude, longitude")
+        .eq("id", user!.id)
+        .single();
 
-    if (!data?.address) return;
+      if (!data?.address) return;
 
-    // Auto-confirm the saved address so Pay Now works immediately
-    setConfirmedAddress(data.address);
-    setLocationConfirmed(true);
+      setConfirmedAddress(data.address);
+      setLocationConfirmed(true);
 
-    if (data.latitude && data.longitude) {
-      // Also store coords so "Change Address" can re-open map at the right spot
-      setInitialLocation({ latitude: data.latitude, longitude: data.longitude });
-      setSelectedLocation({ latitude: data.latitude, longitude: data.longitude });
+      if (data.latitude && data.longitude) {
+        setInitialLocation({ latitude: data.latitude, longitude: data.longitude });
+        setSelectedLocation({ latitude: data.latitude, longitude: data.longitude });
+      }
+    } finally {
+      setAddressLoading(false);
     }
   };
 
@@ -96,6 +123,9 @@ const CheckoutScreen = () => {
   const deliveryFee = total >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
   const deliveryGst = Math.round(deliveryFee * DELIVERY_GST_RATE);
   const grandTotal = total + deliveryFee + deliveryGst;
+
+  const addressReady = locationConfirmed || (!!houseNo.trim() && !!street.trim() && !!city.trim() && !!addressState.trim() && !!pincode.trim());
+  const canPay = !addressLoading && !!name.trim() && !!phone.trim() && addressReady;
 
   const getFullAddress = () => {
     if (locationConfirmed && confirmedAddress) return confirmedAddress;
@@ -344,76 +374,82 @@ const CheckoutScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Delivery Address</Text>
 
-          {!showMap && !locationConfirmed && (
+          {addressLoading ? (
+            <AddressSkeleton />
+          ) : (
             <>
-              <TouchableOpacity
-                style={styles.locationButton}
-                onPress={getCurrentLocation}
-                disabled={locationLoading}
-              >
-                {locationLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.locationButtonText}>Use Current Location</Text>
-                )}
-              </TouchableOpacity>
+              {!showMap && !locationConfirmed && (
+                <>
+                  <TouchableOpacity
+                    style={styles.locationButton}
+                    onPress={getCurrentLocation}
+                    disabled={locationLoading}
+                  >
+                    {locationLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.locationButtonText}>Use Current Location</Text>
+                    )}
+                  </TouchableOpacity>
 
-              <View style={styles.orContainer}>
-                <View style={styles.orLine} />
-                <Text style={styles.orText}>OR</Text>
-                <View style={styles.orLine} />
-              </View>
-            </>
-          )}
+                  <View style={styles.orContainer}>
+                    <View style={styles.orLine} />
+                    <Text style={styles.orText}>OR</Text>
+                    <View style={styles.orLine} />
+                  </View>
+                </>
+              )}
 
-          {showMap && (
-            <View>
-              <View style={styles.mapContainer}>
-                <LocationPicker
-                  initialLocation={initialLocation}
-                  onLocationSelect={handleLocationSelect}
-                />
-              </View>
-              <TouchableOpacity style={styles.confirmLocationButton} onPress={confirmLocation}>
-                <Text style={styles.confirmLocationText}>Confirm This Location</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {locationConfirmed && (
-            <View style={styles.confirmedLocationContainer}>
-              <Text style={styles.confirmedLocationTitle}>Delivery Address</Text>
-              <Text style={styles.confirmedLocationText}>{confirmedAddress}</Text>
-              <TouchableOpacity
-                style={styles.changeLocationButton}
-                onPress={() => { setLocationConfirmed(false); setConfirmedAddress(""); setShowMap(false); setSelectedLocation(null); setInitialLocation(undefined); }}
-              >
-                <Text style={styles.changeLocationText}>Change Address</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {!locationConfirmed && !showMap && (
-            <>
-              <Text style={styles.manualEntryTitle}>Enter Address Manually</Text>
-              <Text style={styles.label}>House/Flat No. *</Text>
-              <TextInput style={styles.input} value={houseNo} onChangeText={setHouseNo} placeholder="House/flat number" placeholderTextColor="#555" />
-              <Text style={styles.label}>Street/Area *</Text>
-              <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Street or area" placeholderTextColor="#555" />
-              <Text style={styles.label}>Landmark (Optional)</Text>
-              <TextInput style={styles.input} value={landmark} onChangeText={setLandmark} placeholder="Nearby landmark" placeholderTextColor="#555" />
-              <View style={styles.row}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.label}>City *</Text>
-                  <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor="#555" />
+              {showMap && (
+                <View>
+                  <View style={styles.mapContainer}>
+                    <LocationPicker
+                      initialLocation={initialLocation}
+                      onLocationSelect={handleLocationSelect}
+                    />
+                  </View>
+                  <TouchableOpacity style={styles.confirmLocationButton} onPress={confirmLocation}>
+                    <Text style={styles.confirmLocationText}>Confirm This Location</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={{ flex: 1, marginLeft: 8 }}>
-                  <Text style={styles.label}>State *</Text>
-                  <TextInput style={styles.input} value={addressState} onChangeText={setAddressState} placeholder="State" placeholderTextColor="#555" />
+              )}
+
+              {locationConfirmed && (
+                <View style={styles.confirmedLocationContainer}>
+                  <Text style={styles.confirmedLocationTitle}>Delivery Address</Text>
+                  <Text style={styles.confirmedLocationText}>{confirmedAddress}</Text>
+                  <TouchableOpacity
+                    style={styles.changeLocationButton}
+                    onPress={() => { setLocationConfirmed(false); setConfirmedAddress(""); setShowMap(false); setSelectedLocation(null); setInitialLocation(undefined); }}
+                  >
+                    <Text style={styles.changeLocationText}>Change Address</Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
-              <Text style={styles.label}>Pincode *</Text>
-              <TextInput style={styles.input} value={pincode} onChangeText={setPincode} placeholder="6-digit pincode" placeholderTextColor="#555" keyboardType="numeric" maxLength={6} />
+              )}
+
+              {!locationConfirmed && !showMap && (
+                <>
+                  <Text style={styles.manualEntryTitle}>Enter Address Manually</Text>
+                  <Text style={styles.label}>House/Flat No. *</Text>
+                  <TextInput style={styles.input} value={houseNo} onChangeText={setHouseNo} placeholder="House/flat number" placeholderTextColor="#555" />
+                  <Text style={styles.label}>Street/Area *</Text>
+                  <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Street or area" placeholderTextColor="#555" />
+                  <Text style={styles.label}>Landmark (Optional)</Text>
+                  <TextInput style={styles.input} value={landmark} onChangeText={setLandmark} placeholder="Nearby landmark" placeholderTextColor="#555" />
+                  <View style={styles.row}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={styles.label}>City *</Text>
+                      <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor="#555" />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={styles.label}>State *</Text>
+                      <TextInput style={styles.input} value={addressState} onChangeText={setAddressState} placeholder="State" placeholderTextColor="#555" />
+                    </View>
+                  </View>
+                  <Text style={styles.label}>Pincode *</Text>
+                  <TextInput style={styles.input} value={pincode} onChangeText={setPincode} placeholder="6-digit pincode" placeholderTextColor="#555" keyboardType="numeric" maxLength={6} />
+                </>
+              )}
             </>
           )}
         </View>
@@ -448,9 +484,9 @@ const CheckoutScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={[styles.placeOrderButton, loading && styles.placeOrderButtonDisabled]}
+          style={[styles.placeOrderButton, (!canPay || loading) && styles.placeOrderButtonDisabled]}
           onPress={handlePayment}
-          disabled={loading}
+          disabled={!canPay || loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
