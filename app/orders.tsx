@@ -126,7 +126,7 @@ const OrdersScreen = () => {
                   <Text style={styles.orderPrice}>₹{order.item_price}</Text>
                   <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
                   <View style={styles.orderMeta}>
-                    <Text style={styles.orderMetaText}>{order.payment_method === "online" ? "💳 Online" : "💵 COD"}</Text>
+                    <Text style={styles.orderMetaText}>💳 Online</Text>
                     <Text style={styles.orderMetaText}>•</Text>
                     <Text style={[styles.orderMetaText, { color: getStatusColor(order.payment_status) }]}>{order.payment_status.toUpperCase()}</Text>
                   </View>

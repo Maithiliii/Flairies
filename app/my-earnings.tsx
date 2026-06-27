@@ -4,7 +4,7 @@ import ScreenHeader from "../components/ScreenHeader";
 import { useSelector } from "react-redux";
 import { RootState } from "../store";
 import { supabase, getImageUrl } from "../lib/supabase";
-import { IndianRupee, Package, TrendingUp, Clock, CreditCard, Banknote } from "lucide-react-native";
+import { IndianRupee, Package, TrendingUp, CreditCard } from "lucide-react-native";
 
 interface EarningItem {
   id: number; order_id: string; item_title: string; item_image?: string | null;
@@ -16,7 +16,6 @@ interface EarningItem {
 interface EarningsSummary {
   total_earnings: number;
   online_earnings: number;
-  cod_earnings: number;
   total_orders: number;
   this_month_earnings: number;
 }
@@ -62,13 +61,9 @@ const MyEarningsScreen = () => {
       const thisMonth = now.getMonth();
       const thisYear = now.getFullYear();
 
-      const onlineOrders = mapped.filter((e) => e.payment_method === "online");
-      const codOrders = mapped.filter((e) => e.payment_method === "cod");
-
       setSummary({
         total_earnings: mapped.reduce((s, e) => s + e.seller_earnings, 0),
-        online_earnings: onlineOrders.reduce((s, e) => s + e.seller_earnings, 0),
-        cod_earnings: codOrders.reduce((s, e) => s + e.seller_earnings, 0),
+        online_earnings: mapped.reduce((s, e) => s + e.seller_earnings, 0),
         total_orders: mapped.length,
         this_month_earnings: mapped
           .filter((e) => { const d = new Date(e.created_at); return d.getMonth() === thisMonth && d.getFullYear() === thisYear; })
@@ -111,7 +106,7 @@ const MyEarningsScreen = () => {
               </View>
             </View>
 
-            {/* 3 stat cards */}
+            {/* 2 stat cards */}
             <View style={styles.summaryGrid}>
               <View style={[styles.summaryCard, { borderLeftColor: "#fe95b4" }]}>
                 <IndianRupee size={22} color="#fe95b4" strokeWidth={1.8} />
@@ -123,11 +118,6 @@ const MyEarningsScreen = () => {
                 <Text style={styles.summaryValue}>₹{summary.online_earnings.toLocaleString()}</Text>
                 <Text style={styles.summaryLabel}>Online</Text>
               </View>
-              <View style={[styles.summaryCard, { borderLeftColor: "#ff9800" }]}>
-                <Banknote size={22} color="#ff9800" strokeWidth={1.8} />
-                <Text style={styles.summaryValue}>₹{summary.cod_earnings.toLocaleString()}</Text>
-                <Text style={styles.summaryLabel}>COD (Cash)</Text>
-              </View>
             </View>
 
             <View style={styles.ordersRow}>
@@ -135,14 +125,6 @@ const MyEarningsScreen = () => {
               <Text style={styles.ordersText}>{summary.total_orders} item{summary.total_orders !== 1 ? "s" : ""} sold</Text>
             </View>
 
-            {summary.cod_earnings > 0 && (
-              <View style={styles.codNote}>
-                <Clock size={16} color="#e65100" strokeWidth={1.8} />
-                <Text style={styles.codNoteText}>
-                  COD cash is collected by the platform. Your share will be transferred to your bank/UPI once delivery is confirmed.
-                </Text>
-              </View>
-            )}
           </View>
         )}
 
@@ -178,14 +160,9 @@ const MyEarningsScreen = () => {
                   </View>
                 </View>
                 <View style={styles.earningFooter}>
-                  <View style={[styles.methodBadge, item.payment_method === "online" ? styles.onlineBadge : styles.codBadge]}>
-                    {item.payment_method === "online"
-                      ? <CreditCard size={12} color="#1565c0" strokeWidth={2} />
-                      : <Banknote size={12} color="#e65100" strokeWidth={2} />
-                    }
-                    <Text style={[styles.methodText, item.payment_method === "online" ? styles.onlineText : styles.codText]}>
-                      {item.payment_method === "online" ? "Online" : "COD"}
-                    </Text>
+                  <View style={[styles.methodBadge, styles.onlineBadge]}>
+                    <CreditCard size={12} color="#1565c0" strokeWidth={2} />
+                    <Text style={[styles.methodText, styles.onlineText]}>Online</Text>
                   </View>
                   <View style={[styles.payoutBadge, item.payout_status === "completed" ? styles.payoutDone : styles.payoutPending]}>
                     <Text style={[styles.payoutText, item.payout_status === "completed" ? styles.payoutDoneText : styles.payoutPendingText]}>
@@ -220,8 +197,6 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 11, color: "#888", textAlign: "center" },
   ordersRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fff", borderRadius: 12, padding: 14, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
   ordersText: { fontSize: 14, fontWeight: "600", color: "#555" },
-  codNote: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: "#fff3e0", borderRadius: 12, padding: 14, borderLeftWidth: 3, borderLeftColor: "#ff9800" },
-  codNoteText: { flex: 1, fontSize: 12, color: "#e65100", lineHeight: 18 },
   earningsSection: { paddingHorizontal: 20, paddingBottom: 20 },
   sectionTitle: { fontSize: 20, fontWeight: "700", color: "#1f0a1a", marginBottom: 16 },
   emptyState: { alignItems: "center", paddingVertical: 60, paddingHorizontal: 40, gap: 12 },
@@ -242,10 +217,8 @@ const styles = StyleSheet.create({
   earningFooter: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
   methodBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   onlineBadge: { backgroundColor: "#e3f2fd" },
-  codBadge: { backgroundColor: "#fff3e0" },
   methodText: { fontSize: 12, fontWeight: "600" },
   onlineText: { color: "#1565c0" },
-  codText: { color: "#e65100" },
   payoutBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
   payoutDone: { backgroundColor: "#e8f5e9" },
   payoutPending: { backgroundColor: "#fff3e0" },

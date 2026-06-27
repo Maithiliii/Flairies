@@ -23,7 +23,6 @@ const CheckoutScreen = () => {
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone_number || "");
   const [address, setAddress] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"online" | "cod">("online");
   const [loading, setLoading] = useState(false);
   const [platformSettings, setPlatformSettings] = useState<any>(null);
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
@@ -78,7 +77,7 @@ const CheckoutScreen = () => {
   const calculateCommission = () => {
     if (!platformSettings) return 0;
     const total = calculateTotal();
-    const rate = paymentMethod === "cod" ? parseFloat(platformSettings.cod_commission_rate || "0") : parseFloat(platformSettings.commission_rate || "15");
+    const rate = parseFloat(platformSettings.commission_rate || "15");
     return (total * rate) / 100;
   };
 
@@ -86,15 +85,15 @@ const CheckoutScreen = () => {
   const commission = calculateCommission();
   const sellerEarnings = total - commission;
 
-  const createOrder = async (item: any, pmMethod: "online" | "cod") => {
+  const createOrder = async (item: any) => {
     const orderId = `FLR-${Date.now()}`;
     const { data, error } = await supabase.from("orders").insert({
       order_id: orderId,
       item_id: item.id,
       buyer_id: user!.id,
       seller_id: item.user_id,
-      payment_method: pmMethod,
-      payment_status: pmMethod === "cod" ? "pending" : "pending",
+      payment_method: "online",
+      payment_status: "pending",
       order_status: "processing",
       buyer_name: name,
       buyer_phone: phone,
@@ -115,22 +114,14 @@ const CheckoutScreen = () => {
     setLoading(true);
     try {
       const item = items[0];
-      if (paymentMethod === "online") {
-        const orderData = await createOrder(item, "online");
-        setCurrentOrderDbId(orderData.id);
-        setCurrentOrderId(orderData.order_id);
-        setLoading(false);
-        if (useRazorpay) {
-          processRazorpayPayment({ amount: total, orderId: orderData.order_id, userEmail: user.email, userName: name, userPhone: phone, onSuccess: handleRazorpaySuccess, onFailure: handleRazorpayFailure });
-        } else {
-          setShowPaymentGateway(true);
-        }
+      const orderData = await createOrder(item);
+      setCurrentOrderDbId(orderData.id);
+      setCurrentOrderId(orderData.order_id);
+      setLoading(false);
+      if (useRazorpay) {
+        processRazorpayPayment({ amount: total, orderId: orderData.order_id, userEmail: user.email, userName: name, userPhone: phone, onSuccess: handleRazorpaySuccess, onFailure: handleRazorpayFailure });
       } else {
-        const orderData = await createOrder(item, "cod");
-        await supabase.from("items").update({ is_active: false }).eq("id", item.id);
-        Alert.alert("Order Placed!", `Your order ${orderData.order_id} has been placed. Pay ₹${total.toFixed(2)} on delivery.`, [
-          { text: "OK", onPress: () => { dispatch(clearCart()); navigation.navigate("Home" as never); } },
-        ]);
+        setShowPaymentGateway(true);
       }
     } catch (error: any) {
       console.error("Payment error:", error);
@@ -166,13 +157,12 @@ const CheckoutScreen = () => {
 
   const handleRazorpayFailure = (error: any) => {
     if (error.code === "razorpay_unavailable") {
-      Alert.alert("Payment Method Not Available", "Razorpay is not available in Expo Go. Please choose an alternative:", [
+      Alert.alert("Payment Method Not Available", "Razorpay is not available in Expo Go. Use a dev build or mock payment:", [
         { text: "Use Mock Payment", onPress: () => { setUseRazorpay(false); setShowPaymentGateway(true); } },
-        { text: "Cash on Delivery", onPress: () => setPaymentMethod("cod") },
         { text: "Cancel" },
       ]);
     } else if (error.code === "payment_cancelled") {
-      Alert.alert("Payment Cancelled", "You cancelled the payment. You can try again or choose COD.");
+      Alert.alert("Payment Cancelled", "You cancelled the payment. Please try again.");
     } else {
       Alert.alert("Payment Failed", error.description || "Payment failed. Please try again.");
     }
@@ -250,36 +240,29 @@ const CheckoutScreen = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.paymentMethodSelection}>
-            <RadioButton selected={paymentMethod === "online"} onPress={() => setPaymentMethod("online")} title="Online Payment" subtitle="Cards, UPI, Net Banking, Wallets" icon="💳" />
-            <RadioButton selected={paymentMethod === "cod"} onPress={() => setPaymentMethod("cod")} title="Cash on Delivery" subtitle="Pay when your order arrives" icon="💵" />
-          </View>
-          {paymentMethod === "online" && (
-            <View style={styles.onlinePaymentSection}>
-              <Text style={styles.onlinePaymentTitle}>Choose Payment Gateway</Text>
-              <View style={styles.gatewaySelection}>
-                <RadioButton selected={useRazorpay} onPress={() => setUseRazorpay(true)} title="Razorpay (Recommended)" subtitle="Cards • UPI • Net Banking • Wallets" icon="🏦" />
-                <RadioButton selected={!useRazorpay} onPress={() => setUseRazorpay(false)} title="Mock Payment (Testing)" subtitle="For development testing only" icon="🧪" />
-              </View>
+          <View style={styles.onlinePaymentSection}>
+            <Text style={styles.onlinePaymentTitle}>Choose Payment Gateway</Text>
+            <View style={styles.gatewaySelection}>
+              <RadioButton selected={useRazorpay} onPress={() => setUseRazorpay(true)} title="Razorpay (Recommended)" subtitle="Cards • UPI • Net Banking • Wallets" icon="🏦" />
+              <RadioButton selected={!useRazorpay} onPress={() => setUseRazorpay(false)} title="Mock Payment (Testing)" subtitle="For development testing only" icon="🧪" />
             </View>
-          )}
+          </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Price Breakdown</Text>
           <View style={styles.priceRow}><Text style={styles.priceLabel}>Item Total</Text><Text style={styles.priceValue}>₹{total.toFixed(2)}</Text></View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Platform Fee ({paymentMethod === "cod" ? platformSettings?.cod_commission_rate ?? 0 : platformSettings?.commission_rate ?? 15}%)</Text>
-            <Text style={styles.priceValue}>{paymentMethod === "cod" ? "₹0.00" : `₹${commission.toFixed(2)}`}</Text>
+            <Text style={styles.priceLabel}>Platform Fee ({platformSettings?.commission_rate ?? 15}%)</Text>
+            <Text style={styles.priceValue}>₹{commission.toFixed(2)}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.priceRow}><Text style={styles.totalLabel}>Total Amount</Text><Text style={styles.totalValue}>₹{total.toFixed(2)}</Text></View>
-          {paymentMethod === "online" && <Text style={styles.note}>Seller will receive ₹{sellerEarnings.toFixed(2)} after platform commission</Text>}
-          {paymentMethod === "cod" && <Text style={styles.note}>✓ No commission on COD orders. Seller receives full amount.</Text>}
+          <Text style={styles.note}>Seller will receive ₹{sellerEarnings.toFixed(2)} after platform commission</Text>
         </View>
 
         <TouchableOpacity style={[styles.placeOrderButton, loading && styles.placeOrderButtonDisabled]} onPress={handlePayment} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.placeOrderText}>{paymentMethod === "online" ? "Pay Now" : "Place Order"}</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.placeOrderText}>Pay Now</Text>}
         </TouchableOpacity>
       </ScrollView>
 

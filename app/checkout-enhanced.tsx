@@ -54,7 +54,6 @@ const CheckoutScreen = () => {
   const [addressState, setAddressState] = useState("");
   const [pincode, setPincode] = useState("");
 
-  const [paymentMethod, setPaymentMethod] = useState<"online" | "cod">("online");
   const [deleteTarget, setDeleteTarget] = useState<CartItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -82,7 +81,7 @@ const CheckoutScreen = () => {
     return "BUY";
   }
 
-  const commission = paymentMethod === "online" ? total * PLATFORM_COMMISSION_RATE : 0;
+  const commission = total * PLATFORM_COMMISSION_RATE;
   const sellerEarnings = total - commission;
 
   const getFullAddress = () => {
@@ -175,11 +174,7 @@ const CheckoutScreen = () => {
 
     setLoading(true);
     try {
-      if (paymentMethod === "online") {
-        await processOnlinePayment(items);
-      } else {
-        await processCODOrder(items);
-      }
+      await processOnlinePayment(items);
     } catch (error) {
       Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
@@ -243,30 +238,6 @@ const CheckoutScreen = () => {
       .catch((err: any) => {
         Alert.alert("Payment Failed", err?.description || "Payment was cancelled");
       });
-  };
-
-  const processCODOrder = async (cartItems: any[]) => {
-    const { data, error } = await supabase.functions.invoke("create-razorpay-order", {
-      body: {
-        cart_items: cartItems.map((i) => ({ id: i.id, days: i.rent_days || 1 })),
-        buyer_name: name,
-        buyer_phone: phone,
-        delivery_address: getFullAddress(),
-        payment_method: "cod",
-      },
-    });
-
-    if (error || data?.error) {
-      Alert.alert("Error", data?.error || error?.message || "Failed to place order");
-      return;
-    }
-
-    dispatch(clearCart());
-    Alert.alert(
-      "Order Placed!",
-      `${data.item_count} item${data.item_count > 1 ? "s" : ""} confirmed.\nPay ₹${data.amount.toFixed(2)} on delivery.`,
-      [{ text: "OK", onPress: () => navigation.navigate("Home" as never) }]
-    );
   };
 
   return (
@@ -424,29 +395,6 @@ const CheckoutScreen = () => {
           )}
         </View>
 
-        {/* Payment Method */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.paymentOptions}>
-            <TouchableOpacity
-              style={[styles.paymentOption, paymentMethod === "online" && styles.paymentOptionActive]}
-              onPress={() => setPaymentMethod("online")}
-            >
-              <Text style={paymentMethod === "online" ? styles.paymentOptionTextActive : styles.paymentOptionText}>
-                Online Payment
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.paymentOption, paymentMethod === "cod" && styles.paymentOptionActive]}
-              onPress={() => setPaymentMethod("cod")}
-            >
-              <Text style={paymentMethod === "cod" ? styles.paymentOptionTextActive : styles.paymentOptionText}>
-                Cash on Delivery
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Price Breakdown */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Price Breakdown</Text>
@@ -455,26 +403,17 @@ const CheckoutScreen = () => {
             <Text style={styles.priceValue}>₹{total.toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>
-              Platform Fee {paymentMethod === "online" ? "(15%)" : ""}
-            </Text>
-            <Text style={styles.priceValue}>
-              {paymentMethod === "online" ? `₹${commission.toFixed(2)}` : "₹0.00"}
-            </Text>
+            <Text style={styles.priceLabel}>Platform Fee (15%)</Text>
+            <Text style={styles.priceValue}>₹{commission.toFixed(2)}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.priceRow}>
             <Text style={styles.totalLabel}>You Pay</Text>
             <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
           </View>
-          {paymentMethod === "online" && (
-            <Text style={styles.note}>
-              Sellers receive ₹{sellerEarnings.toFixed(2)} total after 15% platform fee. Items ship separately from each seller.
-            </Text>
-          )}
-          {paymentMethod === "cod" && (
-            <Text style={styles.note}>No platform fee on COD orders</Text>
-          )}
+          <Text style={styles.note}>
+            Sellers receive ₹{sellerEarnings.toFixed(2)} total after 15% platform fee. Items ship separately from each seller.
+          </Text>
         </View>
 
         <TouchableOpacity
@@ -485,9 +424,7 @@ const CheckoutScreen = () => {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.placeOrderText}>
-              {paymentMethod === "online" ? "Pay Now" : "Place Order"}
-            </Text>
+            <Text style={styles.placeOrderText}>Pay Now</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -552,11 +489,6 @@ const styles = StyleSheet.create({
   changeLocationText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   manualEntryTitle: { fontSize: 15, fontWeight: "700", color: "#666", marginBottom: 12 },
   row: { flexDirection: "row" },
-  paymentOptions: { flexDirection: "row", gap: 12 },
-  paymentOption: { flex: 1, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, backgroundColor: "#f5f5f5", alignItems: "center", borderWidth: 2, borderColor: "#e0e0e0" },
-  paymentOptionActive: { backgroundColor: "#ffe8f5", borderColor: "#fe95b4" },
-  paymentOptionText: { fontSize: 14, fontWeight: "600", color: "#666" },
-  paymentOptionTextActive: { fontSize: 14, fontWeight: "700", color: "#fe95b4" },
   priceRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   priceLabel: { fontSize: 14, color: "#666" },
   priceValue: { fontSize: 14, fontWeight: "600", color: "#333" },

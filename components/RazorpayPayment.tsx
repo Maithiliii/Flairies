@@ -35,11 +35,8 @@ export const processRazorpayPayment = ({
   if (!RazorpayCheckout) {
     Alert.alert(
       "Payment Not Available",
-      "Razorpay is not available in Expo Go. Please use development build or try COD.",
-      [
-        { text: "Use COD", onPress: () => onFailure({ code: "razorpay_unavailable" }) },
-        { text: "OK" }
-      ]
+      "Online payment requires a development build. Please use a production or dev build of the app.",
+      [{ text: "OK", onPress: () => onFailure({ code: "razorpay_unavailable" }) }]
     );
     return;
   }
