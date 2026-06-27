@@ -67,9 +67,12 @@ serve(async (req) => {
       .from("orders")
       .update({
         payment_status: "paid",
-        order_status: "paid",
+        order_status: "confirmed",
         razorpay_payment_id,
+        razorpay_signature,
         payout_status: "processing",
+        paid_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .in("order_id", orderIds);
 
