@@ -1,0 +1,27 @@
+{
+  "cli": {
+    "version": ">= 16.28.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "API_URL": "https://your-backend-domain.herokuapp.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "API_URL": "https://your-backend-domain.herokuapp.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
