@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
-import { AppRegistry, Image, View, StyleSheet } from "react-native";
+import { AppRegistry, Image, View, Text, StyleSheet, Dimensions, Platform } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Text, Platform } from "react-native";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { PlayfairDisplay_400Regular, PlayfairDisplay_600SemiBold, PlayfairDisplay_700Bold } from "@expo-google-fonts/playfair-display";
 import * as SplashScreen from "expo-splash-screen";
@@ -143,7 +143,26 @@ const App = () => {
 
   if (!fontsLoaded) return null;
 
-  const appContent = (
+  if (Platform.OS === "web") {
+    const screenWidth = Dimensions.get("window").width;
+    if (screenWidth > 500) {
+      const url = typeof window !== "undefined" ? window.location.href : "https://flairies.vercel.app";
+      return (
+        <View style={webStyles.gate}>
+          <Image source={require("./assets/images/icon.png")} style={webStyles.logo} resizeMode="contain" />
+          <Text style={webStyles.brand}>Flairies</Text>
+          <Text style={webStyles.heading}>Made for mobile.</Text>
+          <Text style={webStyles.sub}>Scan the QR code with your phone to open the app.</Text>
+          <View style={webStyles.qrBox}>
+            <QRCode value={url} size={180} color="#1e0a16" backgroundColor="#fff" />
+          </View>
+          <Text style={webStyles.url}>{url}</Text>
+        </View>
+      );
+    }
+  }
+
+  return (
     <Provider store={store}>
       <NotificationProvider>
         <NavigationContainer>
@@ -176,38 +195,32 @@ const App = () => {
       </NotificationProvider>
     </Provider>
   );
-
-  if (Platform.OS === "web") {
-    return (
-      <View style={webStyles.outer}>
-        <View style={webStyles.phone}>
-          {appContent}
-        </View>
-      </View>
-    );
-  }
-
-  return appContent;
 };
 
 const webStyles = StyleSheet.create({
-  outer: {
+  gate: {
     flex: 1,
-    backgroundColor: "#f5e6e0",
+    backgroundColor: "#fff0ec",
     alignItems: "center",
     justifyContent: "center",
     minHeight: "100vh",
+    padding: 40,
   },
-  phone: {
-    width: 430,
-    height: "100vh",
-    overflow: "hidden",
-    backgroundColor: "#fff0ec",
+  logo: { width: 72, height: 72, marginBottom: 4 },
+  brand: { fontSize: 32, fontWeight: "800", color: "#1e0a16", marginBottom: 4 },
+  heading: { fontSize: 22, fontWeight: "700", color: "#fe95b4", marginBottom: 10 },
+  sub: { fontSize: 15, color: "#888", textAlign: "center", maxWidth: 320, lineHeight: 22, marginBottom: 32 },
+  qrBox: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 20,
     shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 40,
-    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+    marginBottom: 20,
   },
+  url: { fontSize: 12, color: "#bbb", textAlign: "center" },
 });
 
 export default App;
