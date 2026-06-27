@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { AppRegistry, Image } from "react-native";
+import { AppRegistry, Image, View, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -143,7 +143,7 @@ const App = () => {
 
   if (!fontsLoaded) return null;
 
-  return (
+  const appContent = (
     <Provider store={store}>
       <NotificationProvider>
         <NavigationContainer>
@@ -176,7 +176,39 @@ const App = () => {
       </NotificationProvider>
     </Provider>
   );
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={webStyles.outer}>
+        <View style={webStyles.phone}>
+          {appContent}
+        </View>
+      </View>
+    );
+  }
+
+  return appContent;
 };
+
+const webStyles = StyleSheet.create({
+  outer: {
+    flex: 1,
+    backgroundColor: "#f5e6e0",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100vh",
+  },
+  phone: {
+    width: 430,
+    height: "100vh",
+    overflow: "hidden",
+    backgroundColor: "#fff0ec",
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 0 },
+  },
+});
 
 export default App;
 
