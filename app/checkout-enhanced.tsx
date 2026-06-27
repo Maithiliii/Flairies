@@ -207,7 +207,11 @@ const CheckoutScreen = () => {
     }
   };
 
-  const verifyAndComplete = async (paymentData: any, cartId: string) => {
+  const verifyAndComplete = async (
+    paymentData: any,
+    cartId: string,
+    orderMeta: { amount: number; itemCount: number }
+  ) => {
     const { data: verifyData, error: verifyError } = await supabase.functions.invoke(
       "verify-razorpay-payment",
       {
@@ -220,14 +224,18 @@ const CheckoutScreen = () => {
       }
     );
     if (verifyError || verifyData?.error) {
-      Alert.alert("Verification Issue", "Payment received but verification failed. Contact support with cart ID: " + cartId);
+      Alert.alert(
+        "Verification Issue",
+        "Payment received but verification failed. Contact support with ref: " + cartId
+      );
       return;
     }
     dispatch(clearCart());
-    Alert.alert("Payment Successful!", "Your order has been placed. Items ship separately from each seller.", [
-      { text: "View Orders", onPress: () => navigation.navigate("Orders" as never) },
-      { text: "Continue Shopping", onPress: () => navigation.navigate("Home" as never) },
-    ]);
+    navigation.navigate("OrderSuccess" as never, {
+      cartId,
+      amount: orderMeta.amount,
+      itemCount: orderMeta.itemCount,
+    } as never);
   };
 
   const processOnlinePayment = async (cartItems: any[]) => {
@@ -265,9 +273,11 @@ const CheckoutScreen = () => {
 
     const useNative = RazorpayCheckout && typeof RazorpayCheckout.open === "function";
 
+    const orderMeta = { amount: data.amount, itemCount: data.item_count };
+
     if (useNative) {
       RazorpayCheckout.open(options)
-        .then((paymentData: any) => verifyAndComplete(paymentData, data.cart_id))
+        .then((paymentData: any) => verifyAndComplete(paymentData, data.cart_id, orderMeta))
         .catch((err: any) => Alert.alert("Payment Failed", err?.description || "Payment was cancelled"));
     } else {
       // Web: load Razorpay checkout.js and open modal
@@ -279,7 +289,7 @@ const CheckoutScreen = () => {
               ...options,
               handler: async (paymentData: any) => {
                 try {
-                  await verifyAndComplete(paymentData, data.cart_id);
+                  await verifyAndComplete(paymentData, data.cart_id, orderMeta);
                 } catch (e: any) {
                   Alert.alert("Error", e.message || "Verification failed");
                 }

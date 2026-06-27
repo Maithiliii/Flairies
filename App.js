@@ -47,6 +47,7 @@ import CategoryListingsScreen from "./app/category-listings";
 import AboutScreen from "./app/about";
 import AddDonationScreen from "./app/add-donation";
 import FavoritesScreen from "./app/favorites";
+import OrderSuccessScreen from "./app/order-success";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -190,6 +191,7 @@ const App = () => {
             <Stack.Screen name="About" component={AboutScreen} />
             <Stack.Screen name="AddDonation" component={AddDonationScreen} />
             <Stack.Screen name="Favorites" component={FavoritesScreen} />
+            <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </NotificationProvider>
