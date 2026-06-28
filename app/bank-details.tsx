@@ -61,25 +61,28 @@ const BankDetailsScreen = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from("profiles")
         .update({
-          account_holder_name: accountHolderName,
-          account_number: accountNumber,
-          ifsc_code: ifscCode,
-          upi_id: upiId,
+          account_holder_name: accountHolderName.trim(),
+          account_number: accountNumber.trim(),
+          ifsc_code: ifscCode.trim().toUpperCase(),
+          upi_id: upiId.trim(),
         })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .select();
 
       if (error) {
-        Alert.alert("Error", "Failed to save bank details");
-      } else {
-        Alert.alert("Success", "Bank details saved successfully!", [
-          { text: "OK", onPress: () => navigation.goBack() },
-        ]);
+        console.error("Bank details save error:", error);
+        Alert.alert("Error", error.message || "Failed to save bank details");
+        return;
       }
-    } catch (error) {
-      Alert.alert("Network Error", "Failed to save bank details");
+
+      Alert.alert("Saved!", "Your payment details have been saved.");
+      navigation.goBack();
+    } catch (err: any) {
+      console.error("Bank details exception:", err);
+      Alert.alert("Error", err.message || "Something went wrong");
     } finally {
       setSaving(false);
     }
