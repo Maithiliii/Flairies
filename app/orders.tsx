@@ -18,6 +18,8 @@ interface Order {
   item_title: string;
   item_image: string | null;
   item_price: string;
+  listing_type: string;
+  rent_price: string | null;
   payment_method: string;
   payment_status: string;
   order_status: string;
@@ -148,6 +150,8 @@ const OrdersScreen = () => {
           item_title: item?.title || "Item",
           item_image: item?.image_url ? getImageUrl(item.image_url) : null,
           item_price: String(raw.item_price ?? item?.price ?? 0),
+          listing_type: item?.listing_type || "sell",
+          rent_price: item?.rent_price ? String(item.rent_price) : null,
           payment_method: raw.payment_method,
           payment_status: raw.payment_status,
           order_status: raw.order_status,
@@ -232,6 +236,13 @@ const OrdersScreen = () => {
                 </View>
               </View>
 
+              {/* Listing type tag */}
+              <View style={styles.typeTag}>
+                <Text style={styles.typeTagText}>
+                  {order.listing_type === "rent" ? "RENT" : order.listing_type === "sell_accessories" ? "ACCESSORIES" : "BUY"}
+                </Text>
+              </View>
+
               {/* Item row */}
               <View style={styles.itemRow}>
                 {order.item_image ? (
@@ -241,7 +252,12 @@ const OrdersScreen = () => {
                 )}
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemTitle} numberOfLines={2}>{order.item_title}</Text>
-                  <Text style={styles.itemPrice}>₹{order.item_price}</Text>
+                  <Text style={styles.itemPrice}>
+                    ₹{order.item_price}
+                    {order.listing_type === "rent" && order.rent_price
+                      ? <Text style={styles.rentSub}> (₹{order.rent_price}/day)</Text>
+                      : null}
+                  </Text>
                   <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
                   <View style={styles.payRow}>
                     <Text style={styles.payChip}>💳 Online</Text>
@@ -309,6 +325,13 @@ const styles = StyleSheet.create({
   orderId: { fontSize: 13, fontWeight: "700", color: "#888" },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { fontSize: 11, fontWeight: "700" },
+
+  typeTag: {
+    alignSelf: "flex-start", backgroundColor: "#ffe8f0",
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginBottom: 10,
+  },
+  typeTagText: { fontSize: 9, fontWeight: "700", letterSpacing: 1.2, color: "#fe95b4" },
+  rentSub: { fontSize: 12, fontWeight: "400", color: "#aaa" },
 
   itemRow: { flexDirection: "row", gap: 12 },
   itemImg: { width: 80, height: 80, borderRadius: 12 },

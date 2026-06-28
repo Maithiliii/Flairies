@@ -17,6 +17,8 @@ interface Sale {
   item_title: string;
   item_image: string | null;
   item_price: string;
+  listing_type: string;
+  rent_price: string | null;
   payment_status: string;
   order_status: string;
   buyer_name: string;
@@ -125,7 +127,7 @@ const MySalesScreen = () => {
       const itemIds = [...new Set(salesData.map((o) => o.item_id).filter(Boolean))];
       const { data: itemsData } = await supabase
         .from("items")
-        .select("id, title, image_url")
+        .select("id, title, image_url, listing_type, rent_price")
         .in("id", itemIds);
 
       const itemMap = Object.fromEntries((itemsData || []).map((i) => [i.id, i]));
@@ -139,6 +141,8 @@ const MySalesScreen = () => {
           item_title: item?.title || "Item",
           item_image: item?.image_url ? getImageUrl(item.image_url) : null,
           item_price: String(raw.item_price ?? 0),
+          listing_type: item?.listing_type || "sell",
+          rent_price: item?.rent_price ? String(item.rent_price) : null,
           payment_status: raw.payment_status,
           order_status: raw.order_status,
           buyer_name: raw.buyer_name || "Buyer",
@@ -229,6 +233,13 @@ const MySalesScreen = () => {
                   </View>
                 </View>
 
+                {/* Listing type tag */}
+                <View style={styles.typeTag}>
+                  <Text style={styles.typeTagText}>
+                    {sale.listing_type === "rent" ? "RENT" : sale.listing_type === "sell_accessories" ? "ACCESSORIES" : "BUY"}
+                  </Text>
+                </View>
+
                 {/* Item row */}
                 <View style={styles.itemRow}>
                   {sale.item_image ? (
@@ -238,7 +249,12 @@ const MySalesScreen = () => {
                   )}
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemTitle} numberOfLines={2}>{sale.item_title}</Text>
-                    <Text style={styles.itemPrice}>₹{sale.item_price}</Text>
+                    <Text style={styles.itemPrice}>
+                      ₹{sale.item_price}
+                      {sale.listing_type === "rent" && sale.rent_price
+                        ? <Text style={styles.rentSub}> (₹{sale.rent_price}/day)</Text>
+                        : null}
+                    </Text>
                     <Text style={styles.orderDate}>{formatDate(sale.created_at)}</Text>
                   </View>
                 </View>
@@ -306,6 +322,13 @@ const styles = StyleSheet.create({
   orderId: { fontSize: 13, fontWeight: "700", color: "#888" },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { fontSize: 11, fontWeight: "700" },
+
+  typeTag: {
+    alignSelf: "flex-start", backgroundColor: "#ffe8f0",
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginBottom: 10,
+  },
+  typeTagText: { fontSize: 9, fontWeight: "700", letterSpacing: 1.2, color: "#fe95b4" },
+  rentSub: { fontSize: 12, fontWeight: "400", color: "#aaa" },
 
   itemRow: { flexDirection: "row", gap: 12 },
   itemImg: { width: 80, height: 80, borderRadius: 12 },
