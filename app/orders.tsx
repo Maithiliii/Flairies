@@ -175,6 +175,31 @@ const OrdersScreen = () => {
 
   const handleRateOrder = (order: Order) => { setSelectedOrder(order); setShowRatingModal(true); };
 
+  const handleConfirmOrder = (order: Order) => {
+    Alert.alert(
+      "Confirm Order",
+      "Have you verified your order details?",
+      [
+        { text: "Not Yet", style: "cancel" },
+        {
+          text: "Yes, Confirm",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from("orders")
+                .update({ order_status: "confirmed", updated_at: new Date().toISOString() })
+                .eq("order_id", order.order_id);
+              if (error) throw error;
+              fetchOrders();
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "Could not confirm order");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSubmitRating = async (rating: number, review: string) => {
     if (!user || !selectedOrder) return;
     try {
@@ -281,6 +306,16 @@ const OrdersScreen = () => {
                 <Text style={styles.sellerText}>Sold by {order.seller_name}</Text>
               </View>
 
+              {/* Buyer confirms order */}
+              {order.order_status === "pending" && order.payment_status === "paid" && (
+                <TouchableOpacity
+                  style={styles.confirmBtn}
+                  onPress={() => handleConfirmOrder(order)}
+                >
+                  <Text style={styles.confirmBtnText}>Confirm Order</Text>
+                </TouchableOpacity>
+              )}
+
               {/* Rate seller */}
               {order.payment_status === "paid" && order.order_status === "delivered" && !order.has_review && (
                 <TouchableOpacity style={styles.rateBtn} onPress={() => handleRateOrder(order)}>
@@ -377,6 +412,12 @@ const styles = StyleSheet.create({
 
   sellerRow: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#f5f5f5" },
   sellerText: { fontSize: 13, color: "#888" },
+
+  confirmBtn: {
+    backgroundColor: "#4caf50", marginTop: 12,
+    paddingVertical: 10, borderRadius: 10, alignItems: "center",
+  },
+  confirmBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 
   rateBtn: {
     backgroundColor: "#fe95b4", marginTop: 12,

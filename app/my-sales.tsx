@@ -87,7 +87,6 @@ const OrderProgress = ({ status }: { status: string }) => {
 
 const nextStatus = (current: string): string | null => {
   switch (current) {
-    case "pending":   return "confirmed";
     case "confirmed": return "shipped";
     case "shipped":   return "delivered";
     default:          return null;
@@ -96,7 +95,6 @@ const nextStatus = (current: string): string | null => {
 
 const nextLabel = (current: string) => {
   switch (current) {
-    case "pending":   return "Confirm Order";
     case "confirmed": return "Mark as Shipped";
     case "shipped":   return "Mark as Delivered";
     default:          return null;
