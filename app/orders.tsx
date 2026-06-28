@@ -190,7 +190,8 @@ const OrdersScreen = () => {
               const { error } = await supabase
                 .from("orders")
                 .update({ order_status: "confirmed", updated_at: new Date().toISOString() })
-                .eq("order_id", order.order_id);
+                .eq("order_id", order.order_id)
+                .eq("buyer_id", user!.id);
               if (error) throw error;
               fetchOrders();
             } catch (err: any) {
@@ -216,7 +217,8 @@ const OrdersScreen = () => {
               const { error } = await supabase
                 .from("orders")
                 .update({ order_status: "cancelled", updated_at: new Date().toISOString() })
-                .eq("order_id", order.order_id);
+                .eq("order_id", order.order_id)
+                .eq("buyer_id", user!.id);
               if (error) throw error;
               Alert.alert(
                 "Refund Initiated",

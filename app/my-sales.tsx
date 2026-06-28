@@ -171,7 +171,8 @@ const MySalesScreen = () => {
           updated_at: new Date().toISOString(),
           ...(next === "delivered" ? { delivered_at: new Date().toISOString() } : {}),
         })
-        .eq("order_id", sale.order_id);
+        .eq("order_id", sale.order_id)
+        .eq("seller_id", user!.id);
       if (error) throw error;
       await fetchSales();
     } catch (err: any) {

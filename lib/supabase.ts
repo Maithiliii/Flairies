@@ -18,8 +18,10 @@ export async function uploadImage(
   filename?: string
 ): Promise<string | null> {
   const isBlobUri = uri.startsWith("blob:") || uri.startsWith("data:");
-  const ext = isBlobUri ? "jpg" : (uri.split(".").pop()?.split("?")[0] ?? "jpg");
-  const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+  const rawExt = isBlobUri ? "jpg" : (uri.split(".").pop()?.split("?")[0]?.toLowerCase() ?? "jpg");
+  const ALLOWED_EXTS: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+  const ext = rawExt in ALLOWED_EXTS ? rawExt : "jpg";
+  const mimeType = ALLOWED_EXTS[ext];
   const name = filename ?? `${Date.now()}.${ext}`;
   const path = `${bucket}/${userId}/${name}`;
 

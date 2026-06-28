@@ -214,6 +214,7 @@ export default function ItemDetailScreen() {
   const displaySize = item.custom_size || item.size;
   const displayCategory = item.custom_category || item.category;
   const seller = item.profiles;
+  const sellerId = seller?.id ?? null;
   const sellerName = seller?.name ?? "Unknown Seller";
   const sellerEmail = seller?.email ?? null;
   const sellerPhone = seller?.phone_number ?? null;
@@ -394,9 +395,9 @@ export default function ItemDetailScreen() {
             style={styles.sellerRow}
             activeOpacity={0.85}
             onPress={() =>
-              sellerEmail &&
+              sellerId &&
               (navigation as any).navigate("SellerProfile", {
-                sellerEmail,
+                sellerId,
                 sellerName,
                 sellerProfilePic: sellerAvatar ?? undefined,
               })

@@ -67,7 +67,8 @@ serve(async (req) => {
     }
     if (total <= 0) throw new Error("Invalid total amount");
 
-    const extraFees = Number(delivery_fee || 0) + Number(gst_amount || 0);
+    // Clamp to zero — client must not be able to send negative fees to reduce charge
+    const extraFees = Math.max(0, Number(delivery_fee || 0)) + Math.max(0, Number(gst_amount || 0));
     const grandTotal = total + extraFees;
     const amountInPaise = Math.round(grandTotal * 100);
     const cartId = `CART${Date.now()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;

@@ -29,40 +29,30 @@ const SellerProfileScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { sellerEmail, sellerName, sellerProfilePic } = route.params as any;
+  const { sellerId: routeSellerId, sellerName, sellerProfilePic } = route.params as any;
 
   const [items, setItems] = useState<Item[]>([]);
   const [soldCount, setSoldCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [sellerId, setSellerId] = useState<string | null>(null);
 
   useEffect(() => { fetchSellerData(); }, []);
 
   const fetchSellerData = async () => {
+    if (!routeSellerId) { setLoading(false); return; }
     try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", sellerEmail)
-        .single();
-
-      if (!profile) { setLoading(false); return; }
-
-      setSellerId(profile.id);
-
-      // Fetch listings and sold count in parallel
+      // Fetch listings and sold count in parallel using ID directly — no email lookup needed
       const [listingsRes, soldRes] = await Promise.all([
         supabase
           .from("items")
           .select("id, title, image_url, price, rent_price, listing_type")
-          .eq("user_id", profile.id)
+          .eq("user_id", routeSellerId)
           .eq("is_active", true)
           .neq("listing_type", "donate")
           .order("created_at", { ascending: false }),
         supabase
           .from("orders")
           .select("*", { count: "exact", head: true })
-          .eq("seller_id", profile.id)
+          .eq("seller_id", routeSellerId)
           .eq("payment_status", "paid"),
       ]);
 
@@ -77,8 +67,8 @@ const SellerProfileScreen = () => {
         }))
       );
       setSoldCount(soldRes.count ?? 0);
-    } catch (error) {
-      console.error("Failed to fetch seller data:", error);
+    } catch (err) {
+      console.error("Failed to fetch seller data:", err);
     } finally {
       setLoading(false);
     }
@@ -100,7 +90,7 @@ const SellerProfileScreen = () => {
           style={styles.chatBtn}
           onPress={() =>
             (navigation as any).navigate("Chat", {
-              recipientEmail: sellerEmail,
+              recipientId: routeSellerId,
               recipientName: sellerName,
               recipientProfilePic: sellerProfilePic,
             })

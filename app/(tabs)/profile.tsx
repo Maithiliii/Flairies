@@ -156,7 +156,7 @@ const ProfileScreen = () => {
       {
         text: "Delete", style: "destructive",
         onPress: async () => {
-          await supabase.from("items").update({ is_active: false }).eq("id", itemId);
+          await supabase.from("items").update({ is_active: false }).eq("id", itemId).eq("user_id", user!.id);
           fetchDonations();
         },
       },

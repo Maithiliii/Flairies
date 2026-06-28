@@ -50,15 +50,21 @@ serve(async (req) => {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    if (computedSig !== razorpay_signature) throw new Error("Invalid payment signature");
+    const sigA = new TextEncoder().encode(computedSig);
+    const sigB = new TextEncoder().encode(razorpay_signature);
+    if (sigA.length !== sigB.length) throw new Error("Invalid payment signature");
+    let mismatch = 0;
+    for (let i = 0; i < sigA.length; i++) mismatch |= sigA[i] ^ sigB[i];
+    if (mismatch !== 0) throw new Error("Invalid payment signature");
 
-    // ── 2. Fetch all orders for this cart ─────────────────────────────────────
+    // ── 2. Fetch all orders for this cart (only if still pending — replay guard) ──
     const { data: orders, error: fetchError } = await supabase
       .from("orders")
-      .select("order_id, item_id, buyer_id, seller_id, seller_earnings")
-      .eq("cart_id", cart_id);
+      .select("order_id, item_id, buyer_id, seller_id, seller_earnings, payment_status")
+      .eq("cart_id", cart_id)
+      .eq("payment_status", "pending");
 
-    if (fetchError || !orders?.length) throw new Error("Orders not found for cart");
+    if (fetchError || !orders?.length) throw new Error("Orders not found or already processed");
     if (orders[0].buyer_id !== user.id) throw new Error("Unauthorized");
 
     // ── 3. Mark all orders as paid ────────────────────────────────────────────
