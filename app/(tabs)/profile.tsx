@@ -14,7 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { supabase, getImageUrl, uploadImage } from "../../lib/supabase";
 import {
   Landmark, PackageOpen, IndianRupee, MapPin, LogOut,
-  ChevronRight, ChevronDown, ChevronUp, Heart, Plus, Star, Info, Bookmark, Pencil,
+  ChevronRight, ChevronDown, ChevronUp, Heart, Plus, Star, Info, Bookmark, Pencil, Store,
 } from "lucide-react-native";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -31,6 +31,7 @@ interface Item {
 const MENU_ITEMS = [
   { key: "favorites", label: "Favorites",    icon: Bookmark,      route: "Favorites"   },
   { key: "orders",    label: "My Orders",    icon: PackageOpen,   route: "Orders"      },
+  { key: "sales",     label: "My Sales",     icon: Store,         route: "MySales"     },
   { key: "earnings",  label: "My Earnings",  icon: IndianRupee,   route: "MyEarnings"  },
   { key: "bank",      label: "Bank Details", icon: Landmark,      route: "BankDetails" },
 ];

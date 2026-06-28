@@ -1,5 +1,8 @@
-﻿import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Alert } from "react-native";
+import React, { useState } from "react";
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Image, Alert,
+} from "react-native";
 import ScreenHeader from "../components/ScreenHeader";
 import { useSelector } from "react-redux";
 import { useFocusEffect } from "@react-navigation/native";
@@ -9,13 +12,93 @@ import { supabase, getImageUrl } from "../lib/supabase";
 import { ShoppingBag } from "lucide-react-native";
 
 interface Order {
-  id: number; order_id: string;
-  item_title: string; item_image: string | null; item_price: string;
-  platform_commission: string; seller_earnings: string;
-  payment_method: string; payment_status: string; order_status: string;
-  buyer_name: string; seller_name: string;
-  created_at: string; delivery_address: string; has_review?: boolean;
+  id: number;
+  order_id: string;
+  item_id: number | null;
+  item_title: string;
+  item_image: string | null;
+  item_price: string;
+  payment_method: string;
+  payment_status: string;
+  order_status: string;
+  seller_name: string;
+  seller_id: string;
+  created_at: string;
+  has_review: boolean;
 }
+
+const STAGES = ["Placed", "Confirmed", "Out for Delivery", "Delivered"];
+
+const stepOf = (status: string) => {
+  switch (status) {
+    case "pending":   return 0;
+    case "confirmed": return 1;
+    case "shipped":   return 2;
+    case "delivered": return 3;
+    default:          return 0;
+  }
+};
+
+const Dot = ({ state }: { state: "done" | "active" | "idle" }) => {
+  if (state === "done") return (
+    <View style={styles.dotDone}>
+      <Text style={styles.dotCheck}>✓</Text>
+    </View>
+  );
+  if (state === "active") return (
+    <View style={styles.dotActive}>
+      <View style={styles.dotActiveInner} />
+    </View>
+  );
+  return <View style={styles.dotIdle} />;
+};
+
+const OrderProgress = ({ status }: { status: string }) => {
+  if (status === "cancelled") return (
+    <View style={styles.cancelledBadge}>
+      <Text style={styles.cancelledText}>Order Cancelled</Text>
+    </View>
+  );
+
+  const step = stepOf(status);
+
+  return (
+    <View style={styles.progressWrap}>
+      {/* Dots + connecting lines */}
+      <View style={styles.dotsRow}>
+        {STAGES.map((_, i) => {
+          const state = i < step ? "done" : i === step ? "active" : "idle";
+          return (
+            <React.Fragment key={i}>
+              <Dot state={state} />
+              {i < STAGES.length - 1 && (
+                <View style={[styles.progressLine, i < step && styles.progressLineFilled]} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </View>
+
+      {/* Labels */}
+      <View style={styles.labelsRow}>
+        {STAGES.map((label, i) => (
+          <Text
+            key={i}
+            numberOfLines={2}
+            style={[
+              styles.stageLabel,
+              i <= step && styles.stageLabelActive,
+              i === step && styles.stageLabelCurrent,
+              { textAlign: i === 0 ? "left" : i === STAGES.length - 1 ? "right" : "center" },
+            ]}
+          >
+            {label}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+};
 
 const OrdersScreen = () => {
   const user = useSelector((state: RootState) => state.auth.user);
@@ -30,53 +113,61 @@ const OrdersScreen = () => {
     if (!user) return;
     setLoading(true);
     try {
+      // Fetch orders separately to avoid RLS join issues
       const { data: ordersData, error } = await supabase
         .from("orders")
-        .select("*, items!item_id(title, image_url, price, rent_price, listing_type), seller:profiles!seller_id(name)")
+        .select("id, order_id, item_id, seller_id, payment_method, payment_status, order_status, item_price, created_at")
         .eq("buyer_id", user.id)
-        .neq("payment_status", "pending")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      if (!ordersData?.length) { setOrders([]); return; }
 
-      const { data: reviewsData } = await supabase.from("reviews").select("order_id").eq("reviewer_id", user.id);
-      const reviewedOrderIds = new Set((reviewsData || []).map((r) => r.order_id));
+      // Fetch item details
+      const itemIds = [...new Set(ordersData.map((o) => o.item_id).filter(Boolean))];
+      const sellerIds = [...new Set(ordersData.map((o) => o.seller_id).filter(Boolean))];
 
-      const mapped: Order[] = (ordersData || []).map((raw) => ({
-        id: raw.id, order_id: raw.order_id,
-        item_title: raw.items?.title || "Unknown Item",
-        item_image: getImageUrl(raw.items?.image_url),
-        item_price: raw.items?.listing_type === "rent" ? String(raw.items?.rent_price ?? 0) : String(raw.items?.price ?? 0),
-        platform_commission: String(raw.platform_commission ?? 0),
-        seller_earnings: String(raw.seller_earnings ?? 0),
-        payment_method: raw.payment_method,
-        payment_status: raw.payment_status,
-        order_status: raw.order_status,
-        buyer_name: user.name,
-        seller_name: raw.seller?.name || "Unknown Seller",
-        created_at: raw.created_at,
-        delivery_address: raw.delivery_address || "",
-        has_review: reviewedOrderIds.has(raw.id),
-      }));
+      const [{ data: itemsData }, { data: sellersData }, { data: reviewsData }] =
+        await Promise.all([
+          supabase.from("items").select("id, title, image_url, price, rent_price, listing_type").in("id", itemIds),
+          supabase.from("profiles").select("id, name").in("id", sellerIds),
+          supabase.from("reviews").select("order_id").eq("reviewer_id", user.id),
+        ]);
+
+      const itemMap = Object.fromEntries((itemsData || []).map((i) => [i.id, i]));
+      const sellerMap = Object.fromEntries((sellersData || []).map((s) => [s.id, s]));
+      const reviewedSet = new Set((reviewsData || []).map((r) => r.order_id));
+
+      const mapped: Order[] = ordersData.map((raw) => {
+        const item = itemMap[raw.item_id];
+        const seller = sellerMap[raw.seller_id];
+        return {
+          id: raw.id,
+          order_id: raw.order_id,
+          item_id: raw.item_id,
+          item_title: item?.title || "Item",
+          item_image: item?.image_url ? getImageUrl(item.image_url) : null,
+          item_price: String(raw.item_price ?? item?.price ?? 0),
+          payment_method: raw.payment_method,
+          payment_status: raw.payment_status,
+          order_status: raw.order_status,
+          seller_name: seller?.name || "Seller",
+          seller_id: raw.seller_id,
+          created_at: raw.created_at,
+          has_review: reviewedSet.has(raw.id),
+        };
+      });
 
       setOrders(mapped);
-    } catch (error) {
-      console.error("Failed to fetch orders:", error);
+    } catch (err) {
+      console.error("fetchOrders error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "paid": case "delivered": return "#4caf50";
-      case "pending": return "#ff9800";
-      case "cancelled": case "failed": return "#f44336";
-      default: return "#999";
-    }
-  };
-
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
   const handleRateOrder = (order: Order) => { setSelectedOrder(order); setShowRatingModal(true); };
 
@@ -90,95 +181,191 @@ const OrdersScreen = () => {
         review_text: review,
       });
       if (error) throw error;
-      Alert.alert("Success", "Thank you for your review!");
+      Alert.alert("Thanks!", "Your review has been submitted.");
       setShowRatingModal(false);
       fetchOrders();
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to submit review");
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to submit review");
+    }
+  };
+
+  const statusColor = (s: string) => {
+    if (s === "delivered" || s === "paid") return "#4caf50";
+    if (s === "cancelled" || s === "failed") return "#e53935";
+    if (s === "confirmed" || s === "shipped") return "#fe95b4";
+    return "#ff9800";
+  };
+
+  const statusLabel = (s: string) => {
+    switch (s) {
+      case "pending":   return "Waiting";
+      case "confirmed": return "Confirmed";
+      case "shipped":   return "Out for Delivery";
+      case "delivered": return "Delivered";
+      case "cancelled": return "Cancelled";
+      default:          return s.toUpperCase();
     }
   };
 
   return (
     <View style={styles.wrapper}>
       <ScreenHeader title="My Orders" />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.ordersList}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
         {loading ? (
-          <ActivityIndicator size="large" color="#fe95b4" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color="#fe95b4" style={{ marginTop: 48 }} />
         ) : orders.length === 0 ? (
-          <View style={styles.emptyState}>
-            <ShoppingBag size={56} color="#fe95b4" strokeWidth={1.5} style={{ marginBottom: 16 }} />
-            <Text style={styles.emptyText}>No purchases yet</Text>
-            <Text style={styles.emptySubtext}>Start shopping to see your orders here</Text>
+          <View style={styles.empty}>
+            <ShoppingBag size={56} color="#fe95b4" strokeWidth={1.5} />
+            <Text style={styles.emptyTitle}>No orders yet</Text>
+            <Text style={styles.emptySub}>Your purchases will show up here</Text>
           </View>
         ) : (
           orders.map((order) => (
-            <View key={order.id} style={styles.orderCard}>
-              <View style={styles.orderHeader}>
-                <Text style={styles.orderId}>Order #{order.order_id}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.order_status) }]}>
-                  <Text style={styles.statusText}>{order.order_status.toUpperCase()}</Text>
+            <View key={order.id} style={styles.card}>
+              {/* Header */}
+              <View style={styles.cardHeader}>
+                <Text style={styles.orderId}>#{order.order_id.slice(-10)}</Text>
+                <View style={[styles.badge, { backgroundColor: statusColor(order.order_status) + "22" }]}>
+                  <Text style={[styles.badgeText, { color: statusColor(order.order_status) }]}>
+                    {statusLabel(order.order_status)}
+                  </Text>
                 </View>
               </View>
-              <View style={styles.orderBody}>
-                {order.item_image && <Image source={{ uri: order.item_image }} style={styles.orderImage} />}
-                <View style={styles.orderDetails}>
-                  <Text style={styles.orderItemTitle}>{order.item_title}</Text>
-                  <Text style={styles.orderPrice}>₹{order.item_price}</Text>
+
+              {/* Item row */}
+              <View style={styles.itemRow}>
+                {order.item_image ? (
+                  <Image source={{ uri: order.item_image }} style={styles.itemImg} />
+                ) : (
+                  <View style={[styles.itemImg, styles.itemImgPlaceholder]} />
+                )}
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemTitle} numberOfLines={2}>{order.item_title}</Text>
+                  <Text style={styles.itemPrice}>₹{order.item_price}</Text>
                   <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
-                  <View style={styles.orderMeta}>
-                    <Text style={styles.orderMetaText}>💳 Online</Text>
-                    <Text style={styles.orderMetaText}>•</Text>
-                    <Text style={[styles.orderMetaText, { color: getStatusColor(order.payment_status) }]}>{order.payment_status.toUpperCase()}</Text>
+                  <View style={styles.payRow}>
+                    <Text style={styles.payChip}>💳 Online</Text>
+                    <Text style={[styles.payStatus, { color: order.payment_status === "paid" ? "#4caf50" : "#ff9800" }]}>
+                      • {order.payment_status.toUpperCase()}
+                    </Text>
                   </View>
                 </View>
               </View>
-              <View style={styles.sellerInfo}>
-                <Text style={styles.sellerInfoText}>Sold by {order.seller_name}</Text>
+
+              {/* Progress tracker */}
+              {order.order_status !== "cancelled" && (
+                <OrderProgress status={order.order_status} />
+              )}
+              {order.order_status === "cancelled" && (
+                <OrderProgress status="cancelled" />
+              )}
+
+              {/* Seller */}
+              <View style={styles.sellerRow}>
+                <Text style={styles.sellerText}>Sold by {order.seller_name}</Text>
               </View>
-              {order.payment_status === "paid" && !order.has_review && (
-                <TouchableOpacity style={styles.rateButton} onPress={() => handleRateOrder(order)}>
-                  <Text style={styles.rateButtonText}>⭐ Rate Seller</Text>
+
+              {/* Rate seller */}
+              {order.payment_status === "paid" && order.order_status === "delivered" && !order.has_review && (
+                <TouchableOpacity style={styles.rateBtn} onPress={() => handleRateOrder(order)}>
+                  <Text style={styles.rateBtnText}>⭐ Rate Seller</Text>
                 </TouchableOpacity>
               )}
               {order.has_review && (
-                <View style={styles.reviewedBadge}><Text style={styles.reviewedText}>✓ Reviewed</Text></View>
+                <View style={styles.reviewedBadge}>
+                  <Text style={styles.reviewedText}>✓ Reviewed</Text>
+                </View>
               )}
             </View>
           ))
         )}
       </ScrollView>
 
-      <RatingModal visible={showRatingModal} orderId={selectedOrder?.order_id || ""} sellerName={selectedOrder?.seller_name || ""} onClose={() => setShowRatingModal(false)} onSubmit={handleSubmitRating} />
+      <RatingModal
+        visible={showRatingModal}
+        orderId={selectedOrder?.order_id || ""}
+        sellerName={selectedOrder?.seller_name || ""}
+        onClose={() => setShowRatingModal(false)}
+        onSubmit={handleSubmitRating}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   wrapper: { flex: 1, backgroundColor: "#fff0ec" },
-  ordersList: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 100 },
-  emptyState: { alignItems: "center", marginTop: 60 },
-  emptyText: { fontSize: 18, fontWeight: "700", color: "#333", marginBottom: 8 },
-  emptySubtext: { fontSize: 14, color: "#999" },
-  orderCard: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
-  orderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  orderId: { fontSize: 14, fontWeight: "700", color: "#666" },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: 11, fontWeight: "700", color: "#fff" },
-  orderBody: { flexDirection: "row", marginBottom: 12 },
-  orderImage: { width: 80, height: 80, borderRadius: 12, marginRight: 12 },
-  orderDetails: { flex: 1, justifyContent: "center" },
-  orderItemTitle: { fontSize: 16, fontWeight: "700", color: "#1f0a1a", marginBottom: 4 },
-  orderPrice: { fontSize: 18, fontWeight: "700", color: "#fe95b4", marginBottom: 4 },
-  orderDate: { fontSize: 13, color: "#999", marginBottom: 6 },
-  orderMeta: { flexDirection: "row", alignItems: "center", gap: 8 },
-  orderMetaText: { fontSize: 12, color: "#666", fontWeight: "600" },
-  sellerInfo: { marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#f0f0f0" },
-  sellerInfoText: { fontSize: 13, color: "#666" },
-  rateButton: { backgroundColor: "#fe95b4", marginTop: 12, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, alignItems: "center" },
-  rateButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  reviewedBadge: { backgroundColor: "#e8f5e9", marginTop: 12, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignItems: "center" },
+  list: { padding: 20, paddingBottom: 100 },
+
+  empty: { alignItems: "center", marginTop: 64, gap: 10 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: "#333" },
+  emptySub: { fontSize: 14, color: "#999" },
+
+  card: {
+    backgroundColor: "#fff", borderRadius: 18, padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+  },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  orderId: { fontSize: 13, fontWeight: "700", color: "#888" },
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  badgeText: { fontSize: 11, fontWeight: "700" },
+
+  itemRow: { flexDirection: "row", gap: 12 },
+  itemImg: { width: 80, height: 80, borderRadius: 12 },
+  itemImgPlaceholder: { backgroundColor: "#f5e8ee" },
+  itemInfo: { flex: 1, justifyContent: "center", gap: 3 },
+  itemTitle: { fontSize: 15, fontWeight: "700", color: "#1f0a1a" },
+  itemPrice: { fontSize: 17, fontWeight: "800", color: "#fe95b4" },
+  orderDate: { fontSize: 12, color: "#aaa" },
+  payRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  payChip: { fontSize: 12, color: "#555", fontWeight: "600" },
+  payStatus: { fontSize: 12, fontWeight: "700" },
+
+  // Progress tracker
+  progressWrap: { marginTop: 16, marginBottom: 4 },
+  dotsRow: { flexDirection: "row", alignItems: "center" },
+  progressLine: { flex: 1, height: 2.5, backgroundColor: "#e0e0e0" },
+  progressLineFilled: { backgroundColor: "#fe95b4" },
+
+  dotDone: {
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: "#fe95b4",
+    alignItems: "center", justifyContent: "center",
+  },
+  dotCheck: { color: "#fff", fontSize: 8, fontWeight: "900", lineHeight: 10 },
+  dotActive: {
+    width: 14, height: 14, borderRadius: 7,
+    borderWidth: 2.5, borderColor: "#fe95b4",
+    alignItems: "center", justifyContent: "center",
+  },
+  dotActiveInner: { width: 5, height: 5, borderRadius: 3, backgroundColor: "#fe95b4" },
+  dotIdle: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: "#ddd" },
+
+  labelsRow: { flexDirection: "row", marginTop: 6 },
+  stageLabel: { flex: 1, fontSize: 9, color: "#bbb", lineHeight: 13 },
+  stageLabelActive: { color: "#e07090" },
+  stageLabelCurrent: { fontWeight: "700" },
+
+  cancelledBadge: {
+    backgroundColor: "#fff3f3", borderRadius: 8, paddingVertical: 8,
+    marginTop: 14, alignItems: "center",
+  },
+  cancelledText: { color: "#e53935", fontSize: 12, fontWeight: "700" },
+
+  sellerRow: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#f5f5f5" },
+  sellerText: { fontSize: 13, color: "#888" },
+
+  rateBtn: {
+    backgroundColor: "#fe95b4", marginTop: 12,
+    paddingVertical: 10, borderRadius: 10, alignItems: "center",
+  },
+  rateBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+
+  reviewedBadge: {
+    backgroundColor: "#e8f5e9", marginTop: 12,
+    paddingVertical: 8, borderRadius: 10, alignItems: "center",
+  },
   reviewedText: { color: "#2e7d32", fontSize: 13, fontWeight: "600" },
 });
 
 export default OrdersScreen;
-
