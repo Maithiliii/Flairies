@@ -114,15 +114,10 @@ const MyEarningsScreen = () => {
                 <Text style={styles.summaryLabel}>Total Earned</Text>
               </View>
               <View style={[styles.summaryCard, { borderLeftColor: "#4caf50" }]}>
-                <CreditCard size={22} color="#4caf50" strokeWidth={1.8} />
-                <Text style={styles.summaryValue}>₹{summary.online_earnings.toLocaleString()}</Text>
-                <Text style={styles.summaryLabel}>Online</Text>
+                <Package size={22} color="#4caf50" strokeWidth={1.8} />
+                <Text style={styles.summaryValue}>{summary.total_orders}</Text>
+                <Text style={styles.summaryLabel}>Items Sold</Text>
               </View>
-            </View>
-
-            <View style={styles.ordersRow}>
-              <Package size={18} color="#9c27b0" strokeWidth={1.8} />
-              <Text style={styles.ordersText}>{summary.total_orders} item{summary.total_orders !== 1 ? "s" : ""} sold</Text>
             </View>
 
           </View>
@@ -162,7 +157,7 @@ const MyEarningsScreen = () => {
                 <View style={styles.earningFooter}>
                   <View style={[styles.methodBadge, styles.onlineBadge]}>
                     <CreditCard size={12} color="#1565c0" strokeWidth={2} />
-                    <Text style={[styles.methodText, styles.onlineText]}>Online</Text>
+                    <Text style={[styles.methodText, styles.onlineText]}>Item Sold</Text>
                   </View>
                   <View style={[styles.payoutBadge, item.payout_status === "completed" ? styles.payoutDone : styles.payoutPending]}>
                     <Text style={[styles.payoutText, item.payout_status === "completed" ? styles.payoutDoneText : styles.payoutPendingText]}>

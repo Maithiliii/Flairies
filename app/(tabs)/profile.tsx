@@ -4,7 +4,7 @@ import {
   Image, ActivityIndicator, Alert, LayoutAnimation, Platform, UIManager,
 } from "react-native";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { setUser, logout } from "../../slices/authSlice";
 import { RootState } from "../../store";
@@ -47,18 +47,21 @@ const ProfileScreen = () => {
   const [profileImage, setProfileImage]   = useState<string | null>(null);
   const [uploading, setUploading]         = useState(false);
   const [showLogout, setShowLogout]       = useState(false);
-  const [donationsOpen, setDonationsOpen] = useState(false);
+  const [donationsOpen, setDonationsOpen] = useState(true);
   const [address, setAddress]             = useState<string | null>(null);
   const [rating, setRating]               = useState<number | null>(null);
 
   useEffect(() => {
     if (user) {
-      fetchDonations();
       fetchAddress();
       fetchRating();
       if (user.profile_picture_url) setProfileImage(user.profile_picture_url);
     }
   }, [user]);
+
+  useFocusEffect(React.useCallback(() => {
+    if (user) fetchDonations();
+  }, [user]));
 
   const fetchRating = async () => {
     if (!user) return;
@@ -145,6 +148,19 @@ const ProfileScreen = () => {
     supabase.auth.signOut();
     dispatch(logout());
     navigation.navigate("Login" as never);
+  };
+
+  const handleDeleteDonation = (itemId: number) => {
+    Alert.alert("Delete Donation", "Remove this donation from your list?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive",
+        onPress: async () => {
+          await supabase.from("items").update({ is_active: false }).eq("id", itemId);
+          fetchDonations();
+        },
+      },
+    ]);
   };
 
   const toggleDonations = () => {
@@ -339,8 +355,13 @@ const ProfileScreen = () => {
                     )}
                     <View style={styles.donItemInfo}>
                       <Text style={styles.donTitle} numberOfLines={1}>{item.title}</Text>
-                      <View style={[styles.statusBadge, item.is_claimed ? styles.statusClaimed : styles.statusAvailable]}>
-                        <Text style={styles.statusText}>{item.is_claimed ? "Claimed" : "Available"}</Text>
+                      <View style={styles.donItemFooter}>
+                        <View style={[styles.statusBadge, item.is_claimed ? styles.statusClaimed : styles.statusAvailable]}>
+                          <Text style={styles.statusText}>{item.is_claimed ? "Claimed" : "Available"}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => handleDeleteDonation(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Text style={styles.donDeleteBtn}>✕</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -501,6 +522,8 @@ const styles = StyleSheet.create({
   donImgPlaceholder: { backgroundColor: "#f5e8ee", justifyContent: "center", alignItems: "center" },
   donItemInfo: { padding: 8 },
   donTitle: { fontSize: 12, fontWeight: "600", color: "#1f0a1a", marginBottom: 6 },
+  donItemFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  donDeleteBtn: { fontSize: 14, color: "#e53935", fontWeight: "700", paddingRight: 2 },
   statusBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   statusAvailable: { backgroundColor: "#e8f5e9" },
   statusClaimed: { backgroundColor: "#fce4ec" },

@@ -16,6 +16,7 @@ interface Item {
   display_size: string; display_category: string; condition: string;
   image_url?: string | null; additional_images: ItemImage[]; image_count: number;
   name: string; user_email?: string; user_profile_picture?: string | null;
+  is_available: boolean;
 }
 
 function mapItem(raw: any, name: string): Item {
@@ -31,6 +32,7 @@ function mapItem(raw: any, name: string): Item {
     additional_images: (raw.item_images || []).map((img: any) => ({ id: img.id, image_url: getImageUrl(img.image_url), order: img.sort_order || 0 })),
     image_count: (raw.item_images?.length || 0) + (raw.image_url ? 1 : 0),
     name, user_email: "", user_profile_picture: null,
+    is_available: raw.is_available !== false,
   };
 }
 
@@ -51,7 +53,7 @@ const ClosetScreen = () => {
     try {
       const { data, error } = await supabase
         .from("items")
-        .select("*, item_images(id, image_url, sort_order)")
+        .select("*, is_available, item_images(id, image_url, sort_order)")
         .eq("user_id", user.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
@@ -67,8 +69,11 @@ const ClosetScreen = () => {
 
   useFocusEffect(React.useCallback(() => { fetchUserItems(); }, [user]));
 
-  const sellingItems = items.filter((item) => item.listing_type === "sell" || item.listing_type === "sell_accessories");
-  const rentingItems = items.filter((item) => item.listing_type === "rent");
+  const sortedItems = [...items].sort((a, b) =>
+    (a.is_available === false ? 1 : 0) - (b.is_available === false ? 1 : 0)
+  );
+  const sellingItems = sortedItems.filter((item) => item.listing_type === "sell" || item.listing_type === "sell_accessories");
+  const rentingItems = sortedItems.filter((item) => item.listing_type === "rent");
 
   return (
     <View style={styles.container}>
@@ -99,7 +104,7 @@ const ClosetScreen = () => {
               <Text style={styles.emptyText}>No items yet. Add your first item!</Text>
             ) : (
               (activeTab === "Selling" ? sellingItems : rentingItems).map((item) => (
-                <TouchableOpacity key={item.id} style={styles.card} onPress={() => handleItemPress(item)} activeOpacity={0.7}>
+                <TouchableOpacity key={item.id} style={[styles.card, !item.is_available && styles.cardSold]} onPress={() => handleItemPress(item)} activeOpacity={0.7}>
                   <View style={styles.cardImageContainer}>
                     {item.image_url ? (
                       <Image source={{ uri: item.image_url }} style={styles.cardImage} resizeMode="cover" />
@@ -108,7 +113,12 @@ const ClosetScreen = () => {
                         <Text style={styles.placeholderText}>No Image</Text>
                       </View>
                     )}
-                    {item.image_count > 1 && (
+                    {!item.is_available && (
+                      <View style={styles.soldOverlay}>
+                        <Text style={styles.soldBadgeText}>SOLD</Text>
+                      </View>
+                    )}
+                    {item.is_available && item.image_count > 1 && (
                       <View style={styles.imageCountBadge}>
                         <Text style={styles.imageCountText}>+{item.image_count - 1}</Text>
                         <Text style={styles.imageCountText}>📷</Text>
@@ -158,6 +168,13 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, color: "#999", textAlign: "center", marginTop: 40 },
   placeholderImage: { backgroundColor: "#f0f0f0", justifyContent: "center", alignItems: "center" },
   placeholderText: { color: "#999", fontSize: 12 },
+  cardSold: { opacity: 0.55 },
+  soldOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.52)", borderRadius: 12,
+    alignItems: "center", justifyContent: "center",
+  },
+  soldBadgeText: { color: "#fff", fontSize: 12, fontWeight: "900", letterSpacing: 2 },
 });
 
 export default ClosetScreen;

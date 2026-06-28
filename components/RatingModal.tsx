@@ -15,7 +15,7 @@ interface RatingModalProps {
   orderId: string;
   sellerName: string;
   onClose: () => void;
-  onSubmit: (rating: number, review: string) => void;
+  onSubmit: (rating: number, review: string) => Promise<void> | void;
 }
 
 const RatingModal: React.FC<RatingModalProps> = ({
@@ -27,23 +27,20 @@ const RatingModal: React.FC<RatingModalProps> = ({
 }) => {
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = () => {
     if (rating === 0) {
-      Alert.alert("Rating Required", "Please select a rating");
+      Alert.alert("Rating Required", "Please select a star rating");
       return;
     }
-
-    setSubmitting(true);
-    onSubmit(rating, review);
-    
-    // Reset form
-    setTimeout(() => {
-      setRating(0);
-      setReview("");
-      setSubmitting(false);
-    }, 500);
+    const savedRating = rating;
+    const savedReview = review;
+    setRating(0);
+    setReview("");
+    onClose();
+    onSubmit(savedRating, savedReview).catch((err: any) => {
+      Alert.alert("Review Error", err?.message || "Could not save your review.");
+    });
   };
 
   return (
@@ -54,7 +51,7 @@ const RatingModal: React.FC<RatingModalProps> = ({
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Rate Your Experience</Text>
-              <TouchableOpacity onPress={onClose} disabled={submitting}>
+              <TouchableOpacity onPress={onClose}>
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -73,7 +70,6 @@ const RatingModal: React.FC<RatingModalProps> = ({
                   <TouchableOpacity
                     key={star}
                     onPress={() => setRating(star)}
-                    disabled={submitting}
                     style={styles.starButton}
                   >
                     <Text style={styles.star}>
@@ -106,28 +102,16 @@ const RatingModal: React.FC<RatingModalProps> = ({
                 multiline
                 numberOfLines={4}
                 maxLength={500}
-                editable={!submitting}
               />
               <Text style={styles.charCount}>{review.length}/500</Text>
             </View>
 
             {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={submitting}
-            >
-              <Text style={styles.submitButtonText}>
-                {submitting ? "Submitting..." : "Submit Review"}
-              </Text>
+            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+              <Text style={styles.submitButtonText}>Submit Review</Text>
             </TouchableOpacity>
 
-            {/* Skip Button */}
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={onClose}
-              disabled={submitting}
-            >
+            <TouchableOpacity style={styles.skipButton} onPress={onClose}>
               <Text style={styles.skipButtonText}>Maybe Later</Text>
             </TouchableOpacity>
           </ScrollView>

@@ -48,6 +48,7 @@ const SearchScreen = () => {
         .from("items")
         .select("*, profiles!user_id(name, email, profile_picture_url), item_images(id, image_url, sort_order)")
         .eq("is_active", true)
+        .eq("is_available", true)
         .neq("listing_type", "donate")
         .order("created_at", { ascending: false });
 

@@ -54,6 +54,7 @@ const AccessoriesScreen = () => {
         .select("id, user_id, title, price, listing_type, image_url, custom_category, category, condition")
         .eq("listing_type", "sell_accessories")
         .eq("is_active", true)
+        .eq("is_available", true)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

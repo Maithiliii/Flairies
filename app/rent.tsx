@@ -53,6 +53,7 @@ const RentScreen = () => {
         .select("id, user_id, title, rent_price, listing_type, image_url")
         .eq("listing_type", "rent")
         .eq("is_active", true)
+        .eq("is_available", true)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

@@ -29,15 +29,16 @@ interface Order {
   has_review: boolean;
 }
 
-const STAGES = ["Placed", "Confirmed", "Out for Delivery", "Delivered"];
+const STAGES = ["Placed", "Confirmed", "Dispatched", "Out for Delivery", "Delivered"];
 
 const stepOf = (status: string) => {
   switch (status) {
-    case "pending":   return 0;
-    case "confirmed": return 1;
-    case "shipped":   return 2;
-    case "delivered": return 3;
-    default:          return 0;
+    case "pending":          return 0;
+    case "confirmed":        return 1;
+    case "dispatched":       return 2;
+    case "out_for_delivery": return 3;
+    case "delivered":        return 4;
+    default:                 return 0;
   }
 };
 
@@ -108,6 +109,7 @@ const OrdersScreen = () => {
   const [loading, setLoading] = useState(true);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [localReviewed, setLocalReviewed] = useState<Set<number>>(new Set());
 
   useFocusEffect(React.useCallback(() => { fetchOrders(); }, []));
 
@@ -178,7 +180,7 @@ const OrdersScreen = () => {
   const handleConfirmOrder = (order: Order) => {
     Alert.alert(
       "Confirm Order",
-      "Have you verified your order details?",
+      "Please confirm you want to proceed with this order. The seller will be notified to ship it.",
       [
         { text: "Not Yet", style: "cancel" },
         {
@@ -200,39 +202,67 @@ const OrdersScreen = () => {
     );
   };
 
+  const handleDenyOrder = (order: Order) => {
+    Alert.alert(
+      "Deny Order",
+      "Are you sure you want to deny this order? A full refund will be initiated.",
+      [
+        { text: "Keep Order", style: "cancel" },
+        {
+          text: "Yes, Deny",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from("orders")
+                .update({ order_status: "cancelled", updated_at: new Date().toISOString() })
+                .eq("order_id", order.order_id);
+              if (error) throw error;
+              Alert.alert(
+                "Refund Initiated",
+                "You will receive your refund within 24 hrs. If not received, mail us at flairies@gmail.com"
+              );
+              fetchOrders();
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "Could not deny order");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSubmitRating = async (rating: number, review: string) => {
     if (!user || !selectedOrder) return;
-    try {
-      const { error } = await supabase.from("reviews").insert({
-        order_id: selectedOrder.id,
-        reviewer_id: user.id,
-        rating,
-        review_text: review,
-      });
-      if (error) throw error;
-      Alert.alert("Thanks!", "Your review has been submitted.");
-      setShowRatingModal(false);
-      fetchOrders();
-    } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to submit review");
-    }
+    setLocalReviewed((prev) => new Set(prev).add(selectedOrder.id));
+    const { error } = await supabase.from("reviews").insert({
+      order_id: selectedOrder.id,
+      reviewer_id: user.id,
+      rating,
+      review_text: review,
+    });
+    if (error) console.error("Review insert error:", error.message);
+    fetchOrders();
   };
 
   const statusColor = (s: string) => {
-    if (s === "delivered" || s === "paid") return "#4caf50";
-    if (s === "cancelled" || s === "failed") return "#e53935";
-    if (s === "confirmed" || s === "shipped") return "#fe95b4";
+    if (s === "delivered")        return "#4caf50";
+    if (s === "cancelled")        return "#e53935";
+    if (s === "out_for_delivery") return "#2196f3";
+    if (s === "dispatched")       return "#9c27b0";
+    if (s === "confirmed")        return "#fe95b4";
     return "#ff9800";
   };
 
   const statusLabel = (s: string) => {
     switch (s) {
-      case "pending":   return "Waiting";
-      case "confirmed": return "Confirmed";
-      case "shipped":   return "Out for Delivery";
-      case "delivered": return "Delivered";
-      case "cancelled": return "Cancelled";
-      default:          return s.toUpperCase();
+      case "pending":          return "Placed";
+      case "confirmed":        return "Confirmed";
+      case "dispatched":       return "Dispatched";
+      case "out_for_delivery": return "Out for Delivery";
+      case "delivered":        return "Delivered";
+      case "cancelled":        return "Cancelled";
+      default:                 return s.toUpperCase();
     }
   };
 
@@ -284,12 +314,6 @@ const OrdersScreen = () => {
                       : null}
                   </Text>
                   <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
-                  <View style={styles.payRow}>
-                    <Text style={styles.payChip}>💳 Online</Text>
-                    <Text style={[styles.payStatus, { color: order.payment_status === "paid" ? "#4caf50" : "#ff9800" }]}>
-                      • {order.payment_status.toUpperCase()}
-                    </Text>
-                  </View>
                 </View>
               </View>
 
@@ -306,25 +330,27 @@ const OrdersScreen = () => {
                 <Text style={styles.sellerText}>Sold by {order.seller_name}</Text>
               </View>
 
-              {/* Buyer confirms order */}
+              {/* Buyer confirms or denies order */}
               {order.order_status === "pending" && order.payment_status === "paid" && (
-                <TouchableOpacity
-                  style={styles.confirmBtn}
-                  onPress={() => handleConfirmOrder(order)}
-                >
-                  <Text style={styles.confirmBtnText}>Confirm Order</Text>
-                </TouchableOpacity>
+                <View style={styles.actionRow}>
+                  <TouchableOpacity style={styles.confirmBtn} onPress={() => handleConfirmOrder(order)}>
+                    <Text style={styles.confirmBtnText}>Confirm</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.denyBtn} onPress={() => handleDenyOrder(order)}>
+                    <Text style={styles.denyBtnText}>Deny</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {/* Rate seller */}
-              {order.payment_status === "paid" && order.order_status === "delivered" && !order.has_review && (
+              {order.payment_status === "paid" && order.order_status === "delivered" && !order.has_review && !localReviewed.has(order.id) && (
                 <TouchableOpacity style={styles.rateBtn} onPress={() => handleRateOrder(order)}>
                   <Text style={styles.rateBtnText}>⭐ Rate Seller</Text>
                 </TouchableOpacity>
               )}
-              {order.has_review && (
+              {(order.has_review || localReviewed.has(order.id)) && (
                 <View style={styles.reviewedBadge}>
-                  <Text style={styles.reviewedText}>✓ Reviewed</Text>
+                  <Text style={styles.reviewedText}>Reviewed</Text>
                 </View>
               )}
             </View>
@@ -413,11 +439,17 @@ const styles = StyleSheet.create({
   sellerRow: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#f5f5f5" },
   sellerText: { fontSize: 13, color: "#888" },
 
+  actionRow: { flexDirection: "row", gap: 10, marginTop: 12 },
   confirmBtn: {
-    backgroundColor: "#4caf50", marginTop: 12,
+    flex: 1, backgroundColor: "#4caf50",
     paddingVertical: 10, borderRadius: 10, alignItems: "center",
   },
   confirmBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  denyBtn: {
+    flex: 1, borderWidth: 1.5, borderColor: "#e53935",
+    paddingVertical: 10, borderRadius: 10, alignItems: "center",
+  },
+  denyBtnText: { color: "#e53935", fontSize: 14, fontWeight: "700" },
 
   rateBtn: {
     backgroundColor: "#fe95b4", marginTop: 12,
@@ -426,10 +458,10 @@ const styles = StyleSheet.create({
   rateBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 
   reviewedBadge: {
-    backgroundColor: "#e8f5e9", marginTop: 12,
+    backgroundColor: "#f0f0f0", marginTop: 12,
     paddingVertical: 8, borderRadius: 10, alignItems: "center",
   },
-  reviewedText: { color: "#2e7d32", fontSize: 13, fontWeight: "600" },
+  reviewedText: { color: "#999", fontSize: 13, fontWeight: "600" },
 });
 
 export default OrdersScreen;

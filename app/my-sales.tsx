@@ -26,15 +26,16 @@ interface Sale {
   created_at: string;
 }
 
-const STAGES = ["Placed", "Confirmed", "Out for Delivery", "Delivered"];
+const STAGES = ["Placed", "Confirmed", "Dispatched", "Out for Delivery", "Delivered"];
 
 const stepOf = (status: string) => {
   switch (status) {
-    case "pending":   return 0;
-    case "confirmed": return 1;
-    case "shipped":   return 2;
-    case "delivered": return 3;
-    default:          return 0;
+    case "pending":          return 0;
+    case "confirmed":        return 1;
+    case "dispatched":       return 2;
+    case "out_for_delivery": return 3;
+    case "delivered":        return 4;
+    default:                 return 0;
   }
 };
 
@@ -87,17 +88,19 @@ const OrderProgress = ({ status }: { status: string }) => {
 
 const nextStatus = (current: string): string | null => {
   switch (current) {
-    case "confirmed": return "shipped";
-    case "shipped":   return "delivered";
-    default:          return null;
+    case "confirmed":        return "dispatched";
+    case "dispatched":       return "out_for_delivery";
+    case "out_for_delivery": return "delivered";
+    default:                 return null;
   }
 };
 
 const nextLabel = (current: string) => {
   switch (current) {
-    case "confirmed": return "Mark as Shipped";
-    case "shipped":   return "Mark as Delivered";
-    default:          return null;
+    case "confirmed":        return "Mark as Dispatched";
+    case "dispatched":       return "Mark as Out for Delivery";
+    case "out_for_delivery": return "Mark as Delivered";
+    default:                 return null;
   }
 };
 
@@ -159,46 +162,34 @@ const MySalesScreen = () => {
     const next = nextStatus(sale.order_status);
     if (!next) return;
 
-    const label = nextLabel(sale.order_status);
-    Alert.alert(
-      label || "Update Status",
-      `Mark this order as "${next}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm",
-          onPress: async () => {
-            setUpdating(sale.order_id);
-            try {
-              const { error } = await supabase
-                .from("orders")
-                .update({
-                  order_status: next,
-                  updated_at: new Date().toISOString(),
-                  ...(next === "delivered" ? { delivered_at: new Date().toISOString() } : {}),
-                })
-                .eq("order_id", sale.order_id);
-              if (error) throw error;
-              await fetchSales();
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Could not update status");
-            } finally {
-              setUpdating(null);
-            }
-          },
-        },
-      ]
-    );
+    setUpdating(sale.order_id);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          order_status: next,
+          updated_at: new Date().toISOString(),
+          ...(next === "delivered" ? { delivered_at: new Date().toISOString() } : {}),
+        })
+        .eq("order_id", sale.order_id);
+      if (error) throw error;
+      await fetchSales();
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not update status");
+    } finally {
+      setUpdating(null);
+    }
   };
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
   const statusColor = (s: string) => {
-    if (s === "delivered") return "#4caf50";
-    if (s === "cancelled") return "#e53935";
-    if (s === "shipped")   return "#2196f3";
-    if (s === "confirmed") return "#fe95b4";
+    if (s === "delivered")        return "#4caf50";
+    if (s === "cancelled")        return "#e53935";
+    if (s === "out_for_delivery") return "#2196f3";
+    if (s === "dispatched")       return "#9c27b0";
+    if (s === "confirmed")        return "#fe95b4";
     return "#ff9800";
   };
 
@@ -291,7 +282,7 @@ const MySalesScreen = () => {
 
                 {sale.order_status === "delivered" && (
                   <View style={styles.deliveredBadge}>
-                    <Text style={styles.deliveredText}>✓ Order Delivered</Text>
+                    <Text style={styles.deliveredText}>Order Delivered</Text>
                   </View>
                 )}
               </View>

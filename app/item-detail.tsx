@@ -299,7 +299,7 @@ export default function ItemDetailScreen() {
             </Text>
             <View style={styles.priceBox}>
               {isDonate ? (
-                <Text style={styles.priceFree}>Free</Text>
+                <View style={styles.donationTag}><Text style={styles.donationTagText}>DONATION</Text></View>
               ) : isRent ? (
                 <View style={styles.priceRow}>
                   <Text style={styles.price}>₹{item.rent_price}</Text>
@@ -669,6 +669,8 @@ const styles = StyleSheet.create({
   price: { fontSize: 22, fontWeight: "800", color: "#fe95b4" },
   priceUnit: { fontSize: 12, color: "#999" },
   priceFree: { fontSize: 20, fontWeight: "700", color: "#4caf50" },
+  donationTag: { backgroundColor: "#ffe8f0", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  donationTagText: { fontSize: 13, fontWeight: "800", color: "#fe95b4", letterSpacing: 1.2 },
   description: { fontSize: 15, color: "#666", lineHeight: 22 },
   chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   chip: {

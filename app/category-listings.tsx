@@ -43,6 +43,7 @@ export default function CategoryListingsScreen() {
         .select("id, user_id, title, price, rent_price, listing_type, image_url, category, custom_category")
         .in("listing_type", listingTypes)
         .eq("is_active", true)
+        .eq("is_available", true)
         .order("created_at", { ascending: false });
 
       if (categoryValue) {

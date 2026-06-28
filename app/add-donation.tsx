@@ -158,11 +158,7 @@ const AddDonationScreen = () => {
       }
 
       setForm(defaultForm());
-      Alert.alert(
-        "Donation Listed",
-        "Your item has been listed. We'll reach out when someone is ready to collect.",
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
+      navigation.goBack();
     } catch (error: any) {
       Alert.alert("Failed", error?.message || "Something went wrong");
     } finally {

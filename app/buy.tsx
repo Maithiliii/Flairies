@@ -56,6 +56,7 @@ const BuyScreen = () => {
         .select("id, user_id, title, price, listing_type, image_url, size, custom_size, condition")
         .eq("listing_type", "sell")
         .eq("is_active", true)
+        .eq("is_available", true)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

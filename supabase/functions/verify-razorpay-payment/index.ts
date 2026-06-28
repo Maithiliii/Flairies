@@ -67,7 +67,7 @@ serve(async (req) => {
       .from("orders")
       .update({
         payment_status: "paid",
-        order_status: "confirmed",
+        order_status: "pending",
         razorpay_payment_id,
         razorpay_signature,
         payout_status: "processing",

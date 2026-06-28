@@ -241,21 +241,16 @@ const AddListingScreen = () => {
         </Text>
       </View>
 
-      {mode !== "Donate" && (
+      {mode !== "Donate" && !hasBankDetails && (
         <View style={styles.bankDetailsStatus}>
           {checkingBankDetails ? (
             <Text style={styles.bankDetailsStatusText}>Checking bank details...</Text>
-          ) : hasBankDetails ? (
-            <View style={styles.bankDetailsSuccess}>
-              <Text style={styles.bankDetailsSuccessIcon}>✓</Text>
-              <Text style={styles.bankDetailsSuccessText}>Bank details added — payments enabled</Text>
-            </View>
           ) : (
             <TouchableOpacity style={styles.bankDetailsWarning} onPress={() => navigation.navigate("BankDetails")} activeOpacity={0.85}>
               <TriangleAlert size={20} color="#e65100" strokeWidth={1.8} />
               <View style={styles.bankDetailsWarningContent}>
                 <Text style={styles.bankDetailsWarningTitle}>Bank details required</Text>
-                <Text style={styles.bankDetailsWarningText}>Tap to add — needed to receive payments</Text>
+                <Text style={styles.bankDetailsWarningText}>Tap to add your bank or UPI details to receive payments</Text>
               </View>
               <Text style={styles.bankDetailsWarningArrow}>›</Text>
             </TouchableOpacity>
